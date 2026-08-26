@@ -10,6 +10,8 @@
 
 **Spec:** `docs/superpowers/specs/2026-08-26-pocketlog-design.md`
 
+**Execution note (2026-08-26):** 사용자 승인에 따라 Docker 기반 로컬 Supabase 실행은 이번 환경에서 생략한다. SQL 마이그레이션과 향후 실행 가능한 pgTAP 계약 테스트는 저장소에 작성하고, 실제 적용 및 RLS 실행 검증은 호스팅된 Supabase 개발 프로젝트에서 수행한다.
+
 ## Global Constraints
 
 - 제품명 `PockeLog`, 시간대 `Asia/Seoul`, 통화 `KRW`를 사용한다.
