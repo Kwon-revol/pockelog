@@ -32,6 +32,10 @@ describe("getAuthRedirect", () => {
     expect(getAuthRedirect("/login", true)).toBe("/ledger");
   });
 
+  it("keeps an authenticated recovery session on the reset screen", () => {
+    expect(getAuthRedirect("/reset-password", true)).toBeNull();
+  });
+
   it("does not redirect a signed-in user on the landing page", () => {
     expect(getAuthRedirect("/", true)).toBeNull();
   });

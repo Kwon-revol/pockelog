@@ -66,7 +66,13 @@ describe("loginWithGateway", () => {
   });
 
   it("uses the same message for a missing account and a wrong password", async () => {
-    const gateway = createGateway();
+    const attemptedEmails: string[] = [];
+    const gateway = createGateway({
+      async signInWithPassword(email) {
+        attemptedEmails.push(email);
+        return { error: true };
+      },
+    });
 
     const missing = await loginWithGateway(
       { identifier: "missing_user", password: "password1!" },
@@ -82,6 +88,9 @@ describe("loginWithGateway", () => {
       message: AUTHENTICATION_ERROR_MESSAGE,
     });
     expect(wrongPassword).toEqual(missing);
+    expect(attemptedEmails).toHaveLength(2);
+    expect(attemptedEmails[0]).toMatch(/@invalid\.pockelog\.test$/);
+    expect(attemptedEmails[1]).toBe("user@example.com");
   });
 });
 

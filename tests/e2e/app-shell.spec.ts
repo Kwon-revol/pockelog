@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { verifyHostedSupabaseE2ESafety } from "./safety";
+
 const integrationEnabled =
   process.env.E2E_ALLOW_HOSTED_SUPABASE === "1" &&
   Boolean(process.env.E2E_SUPABASE_PROJECT_REF) &&
@@ -11,9 +13,7 @@ test.describe("로그인 후 반응형 앱 셸", () => {
   test.skip(!integrationEnabled, "전용 개발 프로젝트 E2E 환경변수가 설정되지 않았습니다.");
 
   test("화면 크기에 맞는 주 메뉴를 표시한다", async ({ page }, testInfo) => {
-    const url = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!);
-    const expectedHost = `${process.env.E2E_SUPABASE_PROJECT_REF}.supabase.co`;
-    if (url.hostname !== expectedHost) throw new Error("E2E Supabase project mismatch");
+    await verifyHostedSupabaseE2ESafety();
 
     const unique = `${Date.now()}${testInfo.workerIndex}`;
     const password = "Pockelog-test-2026!";

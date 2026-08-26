@@ -43,14 +43,9 @@ export async function loginWithGateway(
       ? input.identifier
       : await gateway.resolveLoginEmail(input.identifier);
 
-    if (!email) {
-      return {
-        status: "error" as const,
-        message: AUTHENTICATION_ERROR_MESSAGE,
-      };
-    }
-
-    const result = await gateway.signInWithPassword(email, input.password);
+    const attemptedEmail =
+      email ?? `${input.identifier}@invalid.pockelog.test`;
+    const result = await gateway.signInWithPassword(attemptedEmail, input.password);
 
     return result.error
       ? { status: "error" as const, message: AUTHENTICATION_ERROR_MESSAGE }

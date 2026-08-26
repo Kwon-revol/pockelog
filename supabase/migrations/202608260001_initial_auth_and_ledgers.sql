@@ -43,6 +43,14 @@ create unique index account_identifiers_login_id_unique
 create unique index account_identifiers_email_unique
   on private.account_identifiers (lower(email_normalized));
 
+create table private.project_settings (
+  singleton boolean primary key default true check (singleton),
+  allow_destructive_e2e boolean not null default false
+);
+
+insert into private.project_settings (singleton, allow_destructive_e2e)
+values (true, false);
+
 create table public.ledgers (
   id uuid primary key default gen_random_uuid(),
   owner_id uuid not null references auth.users (id) on delete cascade,
@@ -75,6 +83,23 @@ create table public.ledger_members (
 create unique index ledger_members_one_owner
   on public.ledger_members (ledger_id)
   where role = 'owner';
+
+create or replace function private.handle_new_ledger()
+returns trigger
+language plpgsql
+security definer
+set search_path = ''
+as $$
+begin
+  insert into public.ledger_members (ledger_id, user_id, role)
+  values (new.id, new.owner_id, 'owner');
+  return new;
+end;
+$$;
+
+create trigger on_ledger_created
+after insert on public.ledgers
+for each row execute function private.handle_new_ledger();
 
 create table public.categories (
   id uuid primary key default gen_random_uuid(),
@@ -184,6 +209,18 @@ as $$
   limit 1;
 $$;
 
+create or replace function public.is_destructive_e2e_allowed()
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select settings.allow_destructive_e2e
+  from private.project_settings as settings
+  where settings.singleton = true;
+$$;
+
 create or replace function public.handle_new_user()
 returns trigger
 language plpgsql
@@ -232,9 +269,6 @@ begin
 
   insert into public.ledgers (id, owner_id, kind, name, currency_code, period_start_day)
   values (new_ledger_id, new.id, 'personal', '내 장부', 'KRW', 1);
-
-  insert into public.ledger_members (ledger_id, user_id, role)
-  values (new_ledger_id, new.id, 'owner');
 
   insert into public.categories (ledger_id, type, name, color, sort_order)
   values
@@ -335,7 +369,7 @@ using (public.is_ledger_member(ledger_id));
 create policy ledger_members_insert_owner
 on public.ledger_members for insert
 to authenticated
-with check (public.is_ledger_owner(ledger_id));
+with check (public.is_ledger_owner(ledger_id) and role = 'member');
 
 create policy ledger_members_delete_owner_or_self
 on public.ledger_members for delete
@@ -364,11 +398,6 @@ to authenticated
 using (public.is_ledger_owner(ledger_id))
 with check (public.is_ledger_owner(ledger_id));
 
-create policy categories_delete_owner
-on public.categories for delete
-to authenticated
-using (public.is_ledger_owner(ledger_id));
-
 revoke all on all tables in schema public from anon;
 revoke all on all tables in schema public from authenticated;
 
@@ -383,7 +412,7 @@ grant update (name, period_start_day) on public.ledgers to authenticated;
 
 grant select, insert, delete on public.ledger_members to authenticated;
 
-grant select, insert, delete on public.categories to authenticated;
+grant select, insert on public.categories to authenticated;
 grant update (name, color, sort_order, is_active) on public.categories to authenticated;
 
 revoke all on function public.set_updated_at() from public, anon, authenticated;
@@ -391,12 +420,15 @@ revoke all on function public.is_ledger_member(uuid) from public, anon;
 revoke all on function public.is_ledger_owner(uuid) from public, anon;
 revoke all on function public.shares_ledger_with(uuid) from public, anon;
 revoke all on function public.resolve_login_email(text) from public, anon, authenticated;
+revoke all on function public.is_destructive_e2e_allowed() from public, anon, authenticated;
 revoke all on function public.handle_new_user() from public, anon, authenticated;
+revoke all on function private.handle_new_ledger() from public, anon, authenticated;
 
 grant execute on function public.is_ledger_member(uuid) to authenticated;
 grant execute on function public.is_ledger_owner(uuid) to authenticated;
 grant execute on function public.shares_ledger_with(uuid) to authenticated;
 grant execute on function public.resolve_login_email(text) to service_role;
+grant execute on function public.is_destructive_e2e_allowed() to service_role;
 
 alter default privileges in schema public revoke all on tables from anon;
 alter default privileges in schema public revoke all on functions from public, anon;

@@ -2,7 +2,7 @@ begin;
 set local search_path = public, extensions;
 
 create extension if not exists pgtap with schema extensions;
-select plan(3);
+select plan(6);
 
 insert into auth.users (
   id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -27,6 +27,21 @@ values
     '{"login_id":"rls_user_b","display_name":"RLS 사용자 B","phone_normalized":"01033334444"}'::jsonb,
     now(), now()
   );
+
+select ok(
+  not has_table_privilege('anon', 'public.ledgers', 'select'),
+  'anon은 장부 조회 권한이 없다'
+);
+
+select ok(
+  not has_function_privilege('authenticated', 'public.resolve_login_email(text)', 'execute'),
+  'authenticated 사용자는 로그인 이메일 해석 함수를 호출할 수 없다'
+);
+
+select ok(
+  not has_table_privilege('authenticated', 'public.categories', 'delete'),
+  '분류는 하드 삭제할 수 없다'
+);
 
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '20000000-0000-0000-0000-000000000002', true);

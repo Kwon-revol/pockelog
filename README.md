@@ -56,6 +56,15 @@ E2E_SUPABASE_PROJECT_REF=your-development-project-ref
 ```
 
 프로젝트 ref와 `NEXT_PUBLIC_SUPABASE_URL`의 호스트가 다르면 테스트는 즉시 중단됩니다.
-테스트 가입 직후 앱 화면을 확인하므로 개발 프로젝트에서는 이메일 확인을 꺼야 합니다.
+추가로 개발 프로젝트 SQL Editor에서 아래 값을 명시적으로 켠 경우에만 계정을 만듭니다.
+
+```sql
+update private.project_settings
+set allow_destructive_e2e = true
+where singleton = true;
+```
+
+이 값은 운영 프로젝트에서는 항상 `false`로 유지하세요. 테스트 가입 직후 앱 화면을
+확인하므로 개발 프로젝트에서는 이메일 확인도 꺼야 합니다.
 
 제품 설계와 구현 계획은 `docs/superpowers/`에서 관리합니다.

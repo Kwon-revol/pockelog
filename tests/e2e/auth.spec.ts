@@ -1,5 +1,7 @@
 import { expect, test } from "@playwright/test";
 
+import { verifyHostedSupabaseE2ESafety } from "./safety";
+
 const requiredIntegrationEnv = [
   "NEXT_PUBLIC_SUPABASE_URL",
   "NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY",
@@ -10,15 +12,6 @@ const requiredIntegrationEnv = [
 const integrationEnabled =
   process.env.E2E_ALLOW_HOSTED_SUPABASE === "1" &&
   requiredIntegrationEnv.every((key) => Boolean(process.env[key]));
-
-function verifyDedicatedTestProject() {
-  const url = new URL(process.env.NEXT_PUBLIC_SUPABASE_URL!);
-  const expectedHost = `${process.env.E2E_SUPABASE_PROJECT_REF}.supabase.co`;
-
-  if (url.hostname !== expectedHost) {
-    throw new Error(`E2E Supabase project mismatch: expected ${expectedHost}`);
-  }
-}
 
 test("로그인과 회원가입 공개 화면을 열 수 있다", async ({ page }) => {
   await page.goto("/login");
@@ -31,7 +24,7 @@ test.describe("호스팅된 개발 Supabase 인증", () => {
   test.skip(!integrationEnabled, "전용 개발 프로젝트 E2E 환경변수가 설정되지 않았습니다.");
 
   test("가입하고 아이디와 이메일로 다시 로그인한다", async ({ page }, testInfo) => {
-    verifyDedicatedTestProject();
+    await verifyHostedSupabaseE2ESafety();
     const unique = `${Date.now()}${testInfo.workerIndex}`;
     const loginId = `e2e_${unique}`;
     const email = `${loginId}@example.com`;

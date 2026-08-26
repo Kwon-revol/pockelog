@@ -2,7 +2,7 @@ begin;
 set local search_path = public, extensions;
 
 create extension if not exists pgtap with schema extensions;
-select plan(6);
+select plan(7);
 
 insert into auth.users (
   id,
@@ -59,6 +59,17 @@ select is(
   (select count(*) from public.ledger_members where user_id = '10000000-0000-0000-0000-000000000001' and role = 'owner'),
   1::bigint,
   '가입자를 개인 장부 소유자로 등록한다'
+);
+
+select ok(
+  (
+    select member.user_id = ledger.owner_id
+    from public.ledger_members as member
+    join public.ledgers as ledger on ledger.id = member.ledger_id
+    where member.role = 'owner'
+      and ledger.owner_id = '10000000-0000-0000-0000-000000000001'
+  ),
+  '장부 owner 멤버십은 실제 owner_id와 일치한다'
 );
 
 select is(

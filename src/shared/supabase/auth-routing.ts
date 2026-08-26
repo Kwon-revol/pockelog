@@ -10,7 +10,6 @@ const guestOnlyPaths = new Set([
   "/login",
   "/signup",
   "/forgot-password",
-  "/reset-password",
 ]);
 
 export function isPublicPath(pathname: string) {
