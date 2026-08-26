@@ -24,6 +24,13 @@
 6. Database의 Functions에서 `get_transaction_summary`를 확인한다.
 7. 그다음 애플리케이션 기능 브랜치를 `main`에 병합하고 Vercel 배포를 확인한다.
 
+## 통계 마이그레이션 적용
+
+거래 가계부 마이그레이션 적용이 끝난 프로젝트에서
+`supabase/migrations/202608260003_statistics.sql`을 SQL Editor에 한 번 실행합니다.
+이 마이그레이션은 로그인 사용자의 RLS를 그대로 적용하는 기간별·분류별 집계 함수를 추가합니다.
+앱 코드 병합과 Vercel 재배포보다 먼저 실행해야 합니다.
+
 두 번째 SQL도 같은 프로젝트에서 반복 실행하지 않는다. `type already exists`와 같은 오류가
 발생했을 때 전체 파일을 다시 실행하지 말고, 먼저 Tables와 Functions에서 적용 여부를 확인한다.
 
