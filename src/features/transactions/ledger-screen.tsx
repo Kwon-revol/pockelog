@@ -1,0 +1,159 @@
+"use client";
+
+import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
+
+import { TransactionForm, type TransactionFormAction } from "@/features/transactions/transaction-form";
+import { TransactionList } from "@/features/transactions/transaction-list";
+import type {
+  LedgerPageData,
+  TransactionActionState,
+  TransactionFilters,
+  TransactionListItem,
+  TransactionPage,
+} from "@/features/transactions/types";
+
+type UpdateAction = (id: string, state: TransactionActionState, formData: FormData) => Promise<TransactionActionState>;
+type TrashAction = (id: string) => Promise<TransactionActionState>;
+type LoadPage = (filters: TransactionFilters, cursor: string) => Promise<TransactionPage>;
+
+const won = new Intl.NumberFormat("ko-KR");
+
+class SessionExpiredError extends Error {}
+
+async function fetchPage(filters: TransactionFilters, cursor: string) {
+  const params = new URLSearchParams({
+    cursor,
+    start: filters.startOn,
+    end: filters.endOn,
+    q: filters.query,
+    type: filters.type,
+    sort: filters.sort,
+  });
+  if (filters.categoryId) params.set("category", filters.categoryId);
+  const response = await fetch(`/api/transactions?${params}`);
+  if (response.status === 401) {
+    throw new SessionExpiredError("로그인이 필요합니다.");
+  }
+  if (!response.ok) throw new Error("내역을 불러오지 못했습니다.");
+  return response.json() as Promise<TransactionPage>;
+}
+
+type LedgerScreenProps = {
+  initialData: LedgerPageData;
+  createAction: TransactionFormAction;
+  updateAction: UpdateAction;
+  trashAction: TrashAction;
+  loadPage?: LoadPage;
+};
+
+export function LedgerScreen({ initialData, createAction, updateAction, trashAction, loadPage = fetchPage }: LedgerScreenProps) {
+  const router = useRouter();
+  const [items, setItems] = useState(initialData.page.items);
+  const [nextCursor, setNextCursor] = useState(initialData.page.nextCursor);
+  const [selected, setSelected] = useState<TransactionListItem | null | undefined>(undefined);
+  const [loading, setLoading] = useState(false);
+  const [loadError, setLoadError] = useState<string | null>(null);
+  const sentinelRef = useRef<HTMLDivElement>(null);
+  const requestInFlightRef = useRef(false);
+
+  const requestNextPage = useCallback(async () => {
+    if (!nextCursor || requestInFlightRef.current) return;
+    requestInFlightRef.current = true;
+    setLoading(true);
+    setLoadError(null);
+    try {
+      const page = await loadPage(initialData.filters, nextCursor);
+      setItems((current) => {
+        const known = new Set(current.map((item) => item.id));
+        return [...current, ...page.items.filter((item) => !known.has(item.id))];
+      });
+      setNextCursor(page.nextCursor);
+    } catch (error) {
+      if (error instanceof SessionExpiredError) {
+        const next = `${window.location.pathname}${window.location.search}`;
+        router.push(`/login?next=${encodeURIComponent(next)}`);
+      } else {
+        setLoadError("추가 내역을 불러오지 못했습니다.");
+      }
+    } finally {
+      requestInFlightRef.current = false;
+      setLoading(false);
+    }
+  }, [initialData.filters, loadPage, nextCursor, router]);
+
+  useEffect(() => {
+    const node = sentinelRef.current;
+    if (!node || !nextCursor || loading || loadError) return;
+    const observer = new IntersectionObserver((entries) => {
+      if (entries.some((entry) => entry.isIntersecting)) void requestNextPage();
+    }, { rootMargin: "240px" });
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [loadError, loading, nextCursor, requestNextPage]);
+
+  const editAction: TransactionFormAction = selected
+    ? (state, formData) => updateAction(selected.id, state, formData)
+    : createAction;
+
+  const summaryCards = [
+    { label: "총 수입", value: initialData.summary.incomeTotal, color: "text-emerald-700", testId: "income-total" },
+    { label: "총 지출", value: initialData.summary.expenseTotal, color: "text-rose-600", testId: "expense-total" },
+    { label: "잔액", value: initialData.summary.balance, color: initialData.summary.balance < 0 ? "text-rose-600" : "text-slate-950", testId: "balance-total" },
+  ];
+
+  return (
+    <div className="space-y-7">
+      <section className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
+        <div>
+          <p className="text-sm font-semibold text-emerald-700">{initialData.filters.startOn} ~ {initialData.filters.endOn}</p>
+          <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950">가계부</h1>
+          <p className="mt-2 text-sm text-slate-500">수입과 지출을 기록하고 기간별 흐름을 확인하세요.</p>
+        </div>
+        <button className="hidden rounded-2xl bg-emerald-600 px-5 py-3 text-sm font-bold text-white shadow-lg shadow-emerald-600/20 hover:bg-emerald-700 lg:block" onClick={() => setSelected(null)} type="button">+ 내역 추가</button>
+      </section>
+
+      <section aria-label="기간 요약" className="grid grid-cols-1 gap-3 sm:grid-cols-3">
+        {summaryCards.map((card) => (
+          <article className="rounded-3xl border border-slate-200/80 bg-white p-5 shadow-sm" key={card.label}>
+            <p className="text-sm font-semibold text-slate-500">{card.label}</p>
+            <p className={`mt-2 text-2xl font-black ${card.color}`} data-testid={card.testId}>{won.format(card.value)}원</p>
+          </article>
+        ))}
+      </section>
+
+      <form action="/ledger" className="grid gap-3 rounded-3xl border border-slate-200/80 bg-white p-4 shadow-sm md:grid-cols-2 lg:grid-cols-7" method="get">
+        <label className="text-xs font-bold text-slate-500 lg:col-span-1">시작일<input className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" defaultValue={initialData.filters.startOn} name="start" type="date" /></label>
+        <label className="text-xs font-bold text-slate-500 lg:col-span-1">종료일<input className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" defaultValue={initialData.filters.endOn} name="end" type="date" /></label>
+        <label className="text-xs font-bold text-slate-500 md:col-span-2 lg:col-span-2">검색<input className="mt-1.5 w-full rounded-xl border border-slate-200 px-3 py-2.5 text-sm" defaultValue={initialData.filters.query} maxLength={100} name="q" placeholder="내용 또는 메모" /></label>
+        <label className="text-xs font-bold text-slate-500">유형<select className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm" defaultValue={initialData.filters.type} name="type"><option value="all">전체</option><option value="expense">지출</option><option value="income">수입</option></select></label>
+        <label className="text-xs font-bold text-slate-500">분류<select className="mt-1.5 w-full rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm" defaultValue={initialData.filters.categoryId ?? ""} name="category"><option value="">전체</option>{initialData.categories.map((category) => <option key={category.id} value={category.id}>{category.name}</option>)}</select></label>
+        <div className="flex items-end gap-2"><select aria-label="정렬" className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm" defaultValue={initialData.filters.sort} name="sort"><option value="newest">최신순</option><option value="oldest">오래된순</option></select><button className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white" type="submit">조회</button></div>
+      </form>
+
+      {items.length === 0 ? (
+        <section className="rounded-3xl border border-slate-200/80 bg-white px-6 py-14 text-center shadow-sm">
+          <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-emerald-50 text-2xl">₩</div>
+          <h2 className="mt-5 text-xl font-black text-slate-900">첫 내역을 기록해 보세요</h2>
+          <p className="mx-auto mt-2 max-w-md text-sm leading-6 text-slate-500">수입이나 지출을 추가하면 날짜, 내용, 분류와 금액을 한눈에 확인할 수 있어요.</p>
+          <button className="mt-6 rounded-2xl border border-emerald-200 px-5 py-3 text-sm font-bold text-emerald-700" onClick={() => setSelected(null)} type="button">내역 추가</button>
+        </section>
+      ) : (
+        <TransactionList items={items} hasNext={Boolean(nextCursor)} loading={loading} error={loadError} sentinelRef={sentinelRef} onEdit={setSelected} onRetry={() => void requestNextPage()} />
+      )}
+
+      <button aria-label="내역 추가" className="fixed bottom-20 right-5 z-20 flex size-14 items-center justify-center rounded-full bg-emerald-600 text-3xl font-light text-white shadow-xl shadow-emerald-600/30 lg:hidden" onClick={() => setSelected(null)} type="button">+</button>
+
+      {selected !== undefined ? (
+        <TransactionForm
+          action={editAction}
+          categories={initialData.categories}
+          item={selected}
+          key={selected?.id ?? "new"}
+          onClose={() => setSelected(undefined)}
+          trashAction={selected ? () => trashAction(selected.id) : null}
+        />
+      ) : null}
+    </div>
+  );
+}
