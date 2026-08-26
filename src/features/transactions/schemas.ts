@@ -8,7 +8,10 @@ const amountSchema = z
   .string()
   .trim()
   .regex(/^[1-9]\d*$/, "금액은 1원 이상의 숫자로 입력해 주세요.")
-  .refine((value) => BigInt(value) <= BigInt(Number.MAX_SAFE_INTEGER), "금액이 너무 큽니다.")
+  .refine(
+    (value) => !/^[1-9]\d*$/.test(value) || BigInt(value) <= BigInt(Number.MAX_SAFE_INTEGER),
+    "금액이 너무 큽니다.",
+  )
   .transform(Number);
 
 export const transactionFormSchema = z.object({

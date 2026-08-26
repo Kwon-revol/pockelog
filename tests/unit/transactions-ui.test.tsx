@@ -9,6 +9,10 @@ import type {
   TransactionPage,
 } from "@/features/transactions/types";
 
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
 const fixture: LedgerPageData = {
   ledger: { id: "ledger-1", name: "내 장부", periodStartDay: 1 },
   categories: [
@@ -119,5 +123,88 @@ describe("LedgerScreen", () => {
     await waitFor(() => expect(loadPage).toHaveBeenCalledTimes(1));
     expect(screen.getAllByText("저녁").length).toBeGreaterThan(0);
     expect(screen.queryByText("모든 내역을 확인했어요")).not.toBeInTheDocument();
+  });
+
+  it("keeps an inactive current category available while editing", async () => {
+    const user = userEvent.setup();
+    const inactiveCategory = {
+      id: "55555555-5555-4555-8555-555555555555",
+      name: "예전 식비",
+      color: "#64748B",
+      type: "expense" as const,
+    };
+    const inactiveItem = { ...fixture.page.items[0], category: inactiveCategory };
+    render(
+      <LedgerScreen
+        initialData={{ ...fixture, page: { items: [inactiveItem], nextCursor: null } }}
+        createAction={successAction}
+        updateAction={successAction}
+        trashAction={successAction}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /점심/ }));
+    const dialog = screen.getByRole("dialog", { name: "내역 수정" });
+    expect(within(dialog).getByRole("option", { name: "예전 식비" })).toBeInTheDocument();
+    expect(within(dialog).getByLabelText("분류")).toHaveValue(inactiveCategory.id);
+  });
+
+  it("does not start the same cursor request twice before state rerenders", async () => {
+    let resolvePage!: (page: TransactionPage) => void;
+    const pendingPage = new Promise<TransactionPage>((resolve) => { resolvePage = resolve; });
+    const loadPage = vi.fn(() => pendingPage);
+    render(
+      <LedgerScreen
+        initialData={{ ...fixture, page: { ...fixture.page, nextCursor: "cursor-1" } }}
+        createAction={successAction}
+        updateAction={successAction}
+        trashAction={successAction}
+        loadPage={loadPage}
+      />,
+    );
+
+    await act(async () => {
+      const entry = [{ isIntersecting: true } as IntersectionObserverEntry];
+      observerCallback?.(entry, {} as IntersectionObserver);
+      observerCallback?.(entry, {} as IntersectionObserver);
+    });
+    expect(loadPage).toHaveBeenCalledTimes(1);
+    await act(async () => resolvePage({ items: [], nextCursor: null }));
+  });
+
+  it("keeps the edit panel open and shows a trash failure", async () => {
+    const user = userEvent.setup();
+    render(
+      <LedgerScreen
+        initialData={fixture}
+        createAction={successAction}
+        updateAction={successAction}
+        trashAction={async () => ({ status: "error", message: "이 내역을 변경할 수 없습니다." })}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /점심/ }));
+    const dialog = screen.getByRole("dialog", { name: "내역 수정" });
+    await user.click(within(dialog).getByRole("button", { name: "삭제" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("이 내역을 변경할 수 없습니다.");
+    expect(dialog).toBeVisible();
+  });
+
+  it("keeps the edit panel open when the trash request is rejected", async () => {
+    const user = userEvent.setup();
+    render(
+      <LedgerScreen
+        initialData={fixture}
+        createAction={successAction}
+        updateAction={successAction}
+        trashAction={async () => { throw new Error("network down"); }}
+      />,
+    );
+
+    await user.click(screen.getByRole("button", { name: /점심/ }));
+    const dialog = screen.getByRole("dialog", { name: "내역 수정" });
+    await user.click(within(dialog).getByRole("button", { name: "삭제" }));
+    expect(await within(dialog).findByRole("alert")).toHaveTextContent("휴지통으로 이동하지 못했습니다. 다시 시도해 주세요.");
+    expect(dialog).toBeVisible();
   });
 });

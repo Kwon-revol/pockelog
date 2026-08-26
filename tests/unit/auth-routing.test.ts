@@ -6,7 +6,7 @@ import {
 } from "@/shared/supabase/auth-routing";
 
 describe("isPublicPath", () => {
-  it.each(["/", "/login", "/signup", "/forgot-password", "/auth/callback"])(
+  it.each(["/", "/login", "/signup", "/forgot-password", "/auth/callback", "/api/transactions"])(
     "allows the public path %s",
     (pathname) => {
       expect(isPublicPath(pathname)).toBe(true);

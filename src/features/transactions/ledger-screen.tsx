@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { TransactionForm, type TransactionFormAction } from "@/features/transactions/transaction-form";
 import { TransactionList } from "@/features/transactions/transaction-list";
@@ -18,6 +19,8 @@ type LoadPage = (filters: TransactionFilters, cursor: string) => Promise<Transac
 
 const won = new Intl.NumberFormat("ko-KR");
 
+class SessionExpiredError extends Error {}
+
 async function fetchPage(filters: TransactionFilters, cursor: string) {
   const params = new URLSearchParams({
     cursor,
@@ -29,6 +32,9 @@ async function fetchPage(filters: TransactionFilters, cursor: string) {
   });
   if (filters.categoryId) params.set("category", filters.categoryId);
   const response = await fetch(`/api/transactions?${params}`);
+  if (response.status === 401) {
+    throw new SessionExpiredError("로그인이 필요합니다.");
+  }
   if (!response.ok) throw new Error("내역을 불러오지 못했습니다.");
   return response.json() as Promise<TransactionPage>;
 }
@@ -42,15 +48,18 @@ type LedgerScreenProps = {
 };
 
 export function LedgerScreen({ initialData, createAction, updateAction, trashAction, loadPage = fetchPage }: LedgerScreenProps) {
+  const router = useRouter();
   const [items, setItems] = useState(initialData.page.items);
   const [nextCursor, setNextCursor] = useState(initialData.page.nextCursor);
   const [selected, setSelected] = useState<TransactionListItem | null | undefined>(undefined);
   const [loading, setLoading] = useState(false);
   const [loadError, setLoadError] = useState<string | null>(null);
   const sentinelRef = useRef<HTMLDivElement>(null);
+  const requestInFlightRef = useRef(false);
 
   const requestNextPage = useCallback(async () => {
-    if (!nextCursor || loading) return;
+    if (!nextCursor || requestInFlightRef.current) return;
+    requestInFlightRef.current = true;
     setLoading(true);
     setLoadError(null);
     try {
@@ -60,12 +69,18 @@ export function LedgerScreen({ initialData, createAction, updateAction, trashAct
         return [...current, ...page.items.filter((item) => !known.has(item.id))];
       });
       setNextCursor(page.nextCursor);
-    } catch {
-      setLoadError("추가 내역을 불러오지 못했습니다.");
+    } catch (error) {
+      if (error instanceof SessionExpiredError) {
+        const next = `${window.location.pathname}${window.location.search}`;
+        router.push(`/login?next=${encodeURIComponent(next)}`);
+      } else {
+        setLoadError("추가 내역을 불러오지 못했습니다.");
+      }
     } finally {
+      requestInFlightRef.current = false;
       setLoading(false);
     }
-  }, [initialData.filters, loadPage, loading, nextCursor]);
+  }, [initialData.filters, loadPage, nextCursor, router]);
 
   useEffect(() => {
     const node = sentinelRef.current;

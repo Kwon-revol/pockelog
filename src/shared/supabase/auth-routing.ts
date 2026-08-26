@@ -13,7 +13,9 @@ const guestOnlyPaths = new Set([
 ]);
 
 export function isPublicPath(pathname: string) {
-  return publicPaths.has(pathname) || pathname.startsWith("/auth/");
+  return publicPaths.has(pathname)
+    || pathname.startsWith("/auth/")
+    || pathname === "/api/transactions";
 }
 
 export function getAuthRedirect(requestPath: string, isAuthenticated: boolean) {

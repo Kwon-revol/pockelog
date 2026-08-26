@@ -107,7 +107,7 @@ export function TransactionList({
         </table>
       </div>
 
-      {hasNext ? <div aria-hidden="true" className="h-2" ref={sentinelRef} /> : null}
+      {hasNext ? <div aria-hidden="true" className="h-2" data-testid="transaction-sentinel" ref={sentinelRef} /> : null}
       {loading ? <p aria-live="polite" className="py-3 text-center text-sm text-slate-500">내역을 불러오는 중...</p> : null}
       {error ? (
         <div className="py-3 text-center">

@@ -2,7 +2,7 @@ begin;
 set local search_path = public, extensions;
 
 create extension if not exists pgtap with schema extensions;
-select plan(10);
+select plan(11);
 
 insert into auth.users (
   id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -28,6 +28,19 @@ values
     now(), now()
   );
 
+select set_config(
+  'tests.user_b_expense_category',
+  (
+    select c.id::text
+    from public.categories c
+    join public.ledgers l on l.id = c.ledger_id
+    where l.owner_id = '30000000-0000-0000-0000-000000000002'
+      and c.type = 'expense'
+    limit 1
+  ),
+  true
+);
+
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '30000000-0000-0000-0000-000000000001', true);
 select set_config('request.jwt.claim.role', 'authenticated', true);
@@ -38,13 +51,19 @@ select lives_ok(
       ledger_id, type, occurred_on, description, amount, category_id, created_by, idempotency_key
     ) values (
       (select id from public.ledgers where owner_id = '30000000-0000-0000-0000-000000000001'),
-      'expense', '2026-08-26', '점심', 12500,
+      'expense', '2026-08-26', '  점심  ', 12500,
       (select c.id from public.categories c join public.ledgers l on l.id = c.ledger_id where l.owner_id = '30000000-0000-0000-0000-000000000001' and c.type = 'expense' order by c.sort_order limit 1),
       '30000000-0000-0000-0000-000000000001',
       '31000000-0000-4000-8000-000000000001'
     )
   $$,
   '장부 구성원이 올바른 거래를 만든다'
+);
+
+select is(
+  (select description from public.transactions limit 1),
+  '점심',
+  '거래 텍스트의 앞뒤 공백을 제거해 저장한다'
 );
 
 select throws_ok(
@@ -70,7 +89,7 @@ select throws_ok(
     ) values (
       (select id from public.ledgers where owner_id = '30000000-0000-0000-0000-000000000001'),
       'expense', '2026-08-26', '다른 장부 분류', 1000,
-      (select c.id from public.categories c join public.ledgers l on l.id = c.ledger_id where l.owner_id = '30000000-0000-0000-0000-000000000002' and c.type = 'expense' limit 1),
+      current_setting('tests.user_b_expense_category')::uuid,
       '30000000-0000-0000-0000-000000000001', gen_random_uuid()
     )
   $$,

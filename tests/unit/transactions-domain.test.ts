@@ -88,6 +88,32 @@ describe("transaction input", () => {
       amount: 12500,
     });
   });
+
+  it("returns a validation error instead of throwing for a non-numeric amount", () => {
+    const result = transactionFormSchema.safeParse({
+      type: "expense",
+      occurredOn: "2026-08-26",
+      description: "점심",
+      amount: "십만원",
+      categoryId: "11111111-1111-4111-8111-111111111111",
+      memo: "",
+    });
+
+    expect(result.success).toBe(false);
+  });
+
+  it("returns a validation error instead of throwing for an impossible date", () => {
+    const result = transactionFormSchema.safeParse({
+      type: "expense",
+      occurredOn: "2026-99-99",
+      description: "점심",
+      amount: "12000",
+      categoryId: "11111111-1111-4111-8111-111111111111",
+      memo: "",
+    });
+
+    expect(result.success).toBe(false);
+  });
 });
 
 describe("transaction cursor", () => {

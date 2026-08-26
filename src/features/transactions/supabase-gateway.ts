@@ -10,18 +10,23 @@ import type {
 
 type ServerClient = Awaited<ReturnType<typeof createServerClient>>;
 
+export class TransactionContextError extends Error {}
+
 export async function resolveTransactionContext(
   supabase: ServerClient,
 ): Promise<TransactionSessionContext | null> {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return null;
 
-  const { data: profile } = await supabase
+  const { data: profile, error } = await supabase
     .from("user_private_profiles")
     .select("default_ledger_id")
     .eq("user_id", user.id)
     .maybeSingle();
-  if (!profile?.default_ledger_id) return null;
+  if (error) throw new TransactionContextError("기본 장부 정보를 조회하지 못했습니다.");
+  if (!profile?.default_ledger_id) {
+    throw new TransactionContextError("기본 장부가 준비되지 않았습니다.");
+  }
 
   return { userId: user.id, ledgerId: profile.default_ledger_id };
 }

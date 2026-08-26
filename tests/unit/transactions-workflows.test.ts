@@ -78,6 +78,17 @@ describe("transaction workflows", () => {
     expect(mutated).toBe(false);
   });
 
+  it("does not misreport a default-ledger lookup failure as logout", async () => {
+    const gateway = createGateway({
+      async getSessionContext() { throw new Error("database unavailable"); },
+    });
+
+    await expect(createTransaction(validInput, gateway)).resolves.toEqual({
+      status: "error",
+      message: "내역을 저장하지 못했습니다. 다시 시도해 주세요.",
+    });
+  });
+
   it("maps inaccessible updates and trash operations to one safe message", async () => {
     const gateway = createGateway({
       async update() { return "forbidden"; },

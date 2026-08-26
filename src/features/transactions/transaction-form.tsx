@@ -44,6 +44,7 @@ export function TransactionForm({ categories, item, action, trashAction, onClose
   const [type, setType] = useState<TransactionType>(item?.type ?? "expense");
   const [categoryId, setCategoryId] = useState(item?.category.id ?? "");
   const [idempotencyKey] = useState(() => crypto.randomUUID());
+  const [trashError, setTrashError] = useState<string | null>(null);
   const [trashPending, startTrash] = useTransition();
   const mode = item ? "수정" : "추가";
 
@@ -51,7 +52,10 @@ export function TransactionForm({ categories, item, action, trashAction, onClose
     if (state.status === "success") onClose();
   }, [onClose, state.status]);
 
-  const availableCategories = categories.filter((category) => category.type === type);
+  const categorySource = item && !categories.some((category) => category.id === item.category.id)
+    ? [...categories, item.category]
+    : categories;
+  const availableCategories = categorySource.filter((category) => category.type === type);
   const changeType = (next: TransactionType) => {
     setType(next);
     setCategoryId("");
@@ -59,10 +63,15 @@ export function TransactionForm({ categories, item, action, trashAction, onClose
 
   const moveToTrash = () => {
     if (!trashAction || !window.confirm("이 내역을 휴지통으로 이동할까요?")) return;
-    startTrash(() => {
-      void trashAction().then((result) => {
+    setTrashError(null);
+    startTrash(async () => {
+      try {
+        const result = await trashAction();
         if (result.status === "success") onClose();
-      });
+        else setTrashError(result.message ?? "이 내역을 변경할 수 없습니다.");
+      } catch {
+        setTrashError("휴지통으로 이동하지 못했습니다. 다시 시도해 주세요.");
+      }
     });
   };
 
@@ -114,6 +123,7 @@ export function TransactionForm({ categories, item, action, trashAction, onClose
           </label>
 
           {state.message && state.status === "error" ? <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700" role="alert">{state.message}</p> : null}
+          {trashError ? <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm text-rose-700" role="alert">{trashError}</p> : null}
 
           <div className="flex gap-3 pt-2">
             {item ? <button className="rounded-2xl border border-rose-200 px-5 py-3 text-sm font-bold text-rose-600 disabled:opacity-50" disabled={trashPending} onClick={moveToTrash} type="button">삭제</button> : null}

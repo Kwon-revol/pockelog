@@ -25,7 +25,7 @@ async function requireContext(gateway: TransactionGateway) {
   try {
     return await gateway.getSessionContext();
   } catch {
-    return null;
+    return undefined;
   }
 }
 
@@ -34,7 +34,10 @@ export async function createTransaction(
   gateway: TransactionGateway,
 ): Promise<TransactionActionState> {
   const context = await requireContext(gateway);
-  if (!context) return { status: "error", message: "로그인이 필요합니다." };
+  if (context === null) return { status: "error", message: "로그인이 필요합니다." };
+  if (!context) {
+    return { status: "error", message: "내역을 저장하지 못했습니다. 다시 시도해 주세요." };
+  }
 
   try {
     const result = await gateway.create(context, input);
@@ -59,7 +62,8 @@ export async function updateTransaction(
     return { status: "error", message: CHANGE_ERROR };
   }
   const context = await requireContext(gateway);
-  if (!context) return { status: "error", message: "로그인이 필요합니다." };
+  if (context === null) return { status: "error", message: "로그인이 필요합니다." };
+  if (!context) return { status: "error", message: CHANGE_ERROR };
 
   try {
     const result = await gateway.update(context, id, input);
@@ -79,7 +83,8 @@ export async function trashTransaction(
     return { status: "error", message: CHANGE_ERROR };
   }
   const context = await requireContext(gateway);
-  if (!context) return { status: "error", message: "로그인이 필요합니다." };
+  if (context === null) return { status: "error", message: "로그인이 필요합니다." };
+  if (!context) return { status: "error", message: CHANGE_ERROR };
 
   try {
     const result = await gateway.trash(context, id);

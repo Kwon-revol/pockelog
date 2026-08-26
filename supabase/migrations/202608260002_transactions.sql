@@ -41,6 +41,14 @@ as $$
 declare
   selected_category public.categories%rowtype;
 begin
+  if char_length(new.description) > 100
+    or (new.memo is not null and char_length(new.memo) > 500) then
+    raise exception using errcode = 'P0001', message = 'transaction text too long';
+  end if;
+
+  new.description := btrim(new.description);
+  new.memo := nullif(btrim(new.memo), '');
+
   select * into selected_category
   from public.categories
   where id = new.category_id;

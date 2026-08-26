@@ -33,7 +33,8 @@ export function addDays(date: string, days: number) {
 
 export function isValidDateString(value: string) {
   if (!DATE_PATTERN.test(value)) return false;
-  return formatDate(new Date(`${value}T00:00:00.000Z`)) === value;
+  const parsed = new Date(`${value}T00:00:00.000Z`);
+  return !Number.isNaN(parsed.getTime()) && formatDate(parsed) === value;
 }
 
 export function getLedgerPeriod(now: Date, startDay: number | null) {
