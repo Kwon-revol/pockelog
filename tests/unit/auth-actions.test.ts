@@ -92,6 +92,32 @@ describe("loginWithGateway", () => {
     expect(attemptedEmails[0]).toMatch(/@invalid\.pockelog\.test$/);
     expect(attemptedEmails[1]).toBe("user@example.com");
   });
+
+  it("never authenticates a missing login ID even if the synthetic attempt succeeds", async () => {
+    let signedOut = false;
+    const gateway = createGateway({
+      async resolveLoginEmail() {
+        return null;
+      },
+      async signInWithPassword() {
+        return { error: false };
+      },
+      async signOut() {
+        signedOut = true;
+      },
+    });
+
+    await expect(
+      loginWithGateway(
+        { identifier: "missing_user", password: "password1!" },
+        gateway,
+      ),
+    ).resolves.toEqual({
+      status: "error",
+      message: AUTHENTICATION_ERROR_MESSAGE,
+    });
+    expect(signedOut).toBe(true);
+  });
 });
 
 describe("safeNextPath", () => {
