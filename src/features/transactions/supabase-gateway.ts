@@ -72,15 +72,16 @@ export async function createSupabaseTransactionGateway(): Promise<TransactionGat
     },
 
     async trash(context, id): Promise<ChangeResult> {
-      const { data, error } = await supabase
+      const { count, error } = await supabase
         .from("transactions")
-        .update({ deleted_at: new Date().toISOString(), deleted_by: context.userId })
+        .update(
+          { deleted_at: new Date().toISOString(), deleted_by: context.userId },
+          { count: "exact" },
+        )
         .eq("id", id)
         .eq("ledger_id", context.ledgerId)
-        .is("deleted_at", null)
-        .select("id")
-        .maybeSingle();
-      return !error && data ? "trashed" : error?.code === "500" ? "error" : "forbidden";
+        .is("deleted_at", null);
+      return !error && count === 1 ? "trashed" : error?.code === "500" ? "error" : "forbidden";
     },
   };
 }
