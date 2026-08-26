@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 
+import { logoutAction } from "@/features/auth/actions";
+
 export const metadata: Metadata = { title: "설정" };
 
 export default function SettingsPage() {
@@ -13,6 +15,9 @@ export default function SettingsPage() {
           </button>
         ))}
       </section>
+      <form action={logoutAction}>
+        <button className="rounded-2xl border border-rose-200 px-5 py-3 text-sm font-bold text-rose-700 hover:bg-rose-50" type="submit">로그아웃</button>
+      </form>
     </div>
   );
 }
