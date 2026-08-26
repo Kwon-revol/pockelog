@@ -1,6 +1,11 @@
 import { describe, expect, it } from "vitest";
 
-import { loginSchema, signupSchema } from "@/features/auth/schemas";
+import {
+  forgotPasswordSchema,
+  loginSchema,
+  resetPasswordSchema,
+  signupSchema,
+} from "@/features/auth/schemas";
 
 const validSignup = {
   loginId: "daily_user",
@@ -53,5 +58,27 @@ describe("loginSchema", () => {
       loginSchema.safeParse({ identifier: "사용자 이름", password: "password1!" })
         .success,
     ).toBe(false);
+  });
+});
+
+describe("password reset schemas", () => {
+  it("normalizes the recovery email", () => {
+    expect(forgotPasswordSchema.parse({ email: " User@Example.com " })).toEqual({
+      email: "user@example.com",
+    });
+  });
+
+  it("rejects mismatched replacement passwords", () => {
+    const result = resetPasswordSchema.safeParse({
+      password: "new-password1!",
+      confirmPassword: "different-password1!",
+    });
+
+    expect(result.success).toBe(false);
+    if (!result.success) {
+      expect(result.error.flatten().fieldErrors.confirmPassword).toContain(
+        "비밀번호가 일치하지 않습니다.",
+      );
+    }
   });
 });
