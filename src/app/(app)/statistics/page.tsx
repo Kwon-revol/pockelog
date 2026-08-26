@@ -8,10 +8,12 @@ import { StatisticsAuthenticationError } from "@/features/statistics/workflows";
 export const metadata: Metadata = { title: "통계" };
 
 export default async function StatisticsPage() {
+  let data;
   try {
-    return <StatisticsOverviewScreen data={await getStatisticsOverviewData()} />;
+    data = await getStatisticsOverviewData();
   } catch (error) {
     if (error instanceof StatisticsAuthenticationError) redirect("/login?next=/statistics");
     throw error;
   }
+  return <StatisticsOverviewScreen data={data} />;
 }

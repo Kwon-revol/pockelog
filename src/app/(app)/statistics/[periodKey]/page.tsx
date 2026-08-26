@@ -20,8 +20,9 @@ export default async function StatisticsDetailPage({
   const { periodKey } = await params;
   const query = await searchParams;
   const type = Array.isArray(query.type) ? query.type[0] : query.type;
+  let data;
   try {
-    return <StatisticsDetailScreen initialData={await getStatisticsDetailData(periodKey, type)} />;
+    data = await getStatisticsDetailData(periodKey, type);
   } catch (error) {
     if (error instanceof StatisticsAuthenticationError) {
       redirect(`/login?next=${encodeURIComponent(`/statistics/${periodKey}`)}`);
@@ -29,4 +30,5 @@ export default async function StatisticsDetailPage({
     if (error instanceof StatisticsPeriodError) notFound();
     throw error;
   }
+  return <StatisticsDetailScreen initialData={data} />;
 }
