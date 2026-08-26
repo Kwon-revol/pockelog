@@ -67,3 +67,72 @@ export function getLedgerPeriod(now: Date, startDay: number | null) {
     endExclusive: formatDate(nextStart),
   };
 }
+
+export type LedgerPeriod = {
+  key: string;
+  startOn: string;
+  endOn: string;
+  endExclusive: string;
+};
+
+export function getLedgerPeriodFromStart(
+  startOn: string,
+  startDay: number | null,
+): LedgerPeriod | null {
+  if (!isValidDateString(startOn)) return null;
+  const start = new Date(`${startOn}T00:00:00.000Z`);
+  const year = start.getUTCFullYear();
+  const month = start.getUTCMonth() + 1;
+  let nextStart: Date;
+
+  if (startDay === null) {
+    if (start.getUTCDate() !== monthEnd(year, month).getUTCDate()) return null;
+    nextStart = monthEnd(year, month + 1);
+  } else {
+    if (!Number.isInteger(startDay) || startDay < 1 || startDay > 28) return null;
+    if (start.getUTCDate() !== startDay) return null;
+    nextStart = utcDate(year, month + 1, startDay);
+  }
+
+  const end = new Date(nextStart);
+  end.setUTCDate(end.getUTCDate() - 1);
+  return {
+    key: startOn,
+    startOn,
+    endOn: formatDate(end),
+    endExclusive: formatDate(nextStart),
+  };
+}
+
+function previousPeriodStart(startOn: string, startDay: number | null) {
+  const current = new Date(`${startOn}T00:00:00.000Z`);
+  if (startDay === null) {
+    return formatDate(monthEnd(current.getUTCFullYear(), current.getUTCMonth()));
+  }
+  return formatDate(new Date(Date.UTC(
+    current.getUTCFullYear(),
+    current.getUTCMonth() - 1,
+    startDay,
+  )));
+}
+
+export function listLedgerPeriods(
+  now: Date,
+  startDay: number | null,
+  count: number,
+): LedgerPeriod[] {
+  if (!Number.isInteger(count) || count < 1 || count > 120) {
+    throw new Error("period count must be between 1 and 120");
+  }
+  const current = getLedgerPeriod(now, startDay);
+  const periods: LedgerPeriod[] = [];
+  let startOn = current.startOn;
+
+  for (let index = 0; index < count; index += 1) {
+    const period = getLedgerPeriodFromStart(startOn, startDay);
+    if (!period) throw new Error("failed to derive ledger period");
+    periods.push(period);
+    startOn = previousPeriodStart(startOn, startDay);
+  }
+  return periods;
+}
