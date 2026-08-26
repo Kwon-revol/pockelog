@@ -25,7 +25,7 @@ type TransactionListProps = {
   loading: boolean;
   error: string | null;
   sentinelRef: RefObject<HTMLDivElement | null>;
-  onEdit: (item: TransactionListItem) => void;
+  onEdit?: (item: TransactionListItem) => void;
   onRetry: () => void;
 };
 
@@ -54,13 +54,8 @@ export function TransactionList({
           <div key={group.date}>
             <h2 className="mb-2 text-sm font-bold text-slate-500">{dateLabel(group.date)}</h2>
             <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-sm">
-              {group.items.map((item) => (
-                <button
-                  className="flex w-full items-center gap-3 border-b border-slate-100 px-4 py-4 text-left last:border-0"
-                  key={item.id}
-                  onClick={() => onEdit(item)}
-                  type="button"
-                >
+              {group.items.map((item) => {
+                const content = <>
                   <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: item.category.color }} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-bold text-slate-900">{item.description}</span>
@@ -69,8 +64,13 @@ export function TransactionList({
                   <span className={`font-black ${item.type === "expense" ? "text-rose-600" : "text-emerald-700"}`}>
                     {amountText(item)}
                   </span>
-                </button>
-              ))}
+                </>;
+                return onEdit ? (
+                  <button className="flex w-full items-center gap-3 border-b border-slate-100 px-4 py-4 text-left last:border-0" key={item.id} onClick={() => onEdit(item)} type="button">{content}</button>
+                ) : (
+                  <div className="flex w-full items-center gap-3 border-b border-slate-100 px-4 py-4 text-left last:border-0" key={item.id}>{content}</div>
+                );
+              })}
             </div>
           </div>
         ))}
@@ -90,9 +90,9 @@ export function TransactionList({
           <tbody>
             {items.map((item) => (
               <tr
-                className="cursor-pointer border-t border-slate-100 transition hover:bg-emerald-50/40"
+                className={`border-t border-slate-100 ${onEdit ? "cursor-pointer transition hover:bg-emerald-50/40" : ""}`}
                 key={item.id}
-                onClick={() => onEdit(item)}
+                onClick={onEdit ? () => onEdit(item) : undefined}
               >
                 <td className="px-5 py-4 text-slate-500">{item.occurredOn}</td>
                 <td className="px-5 py-4 font-bold text-slate-900">{item.description}</td>

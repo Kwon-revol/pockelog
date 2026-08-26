@@ -37,6 +37,7 @@ export interface StatisticsGateway {
 
 export class StatisticsAuthenticationError extends Error {}
 export class StatisticsQueryError extends Error {}
+export class StatisticsPeriodError extends StatisticsQueryError {}
 
 async function requireContext(gateway: StatisticsGateway) {
   try {
@@ -70,7 +71,7 @@ export async function loadStatisticsDetail(
 ): Promise<StatisticsDetailData> {
   const context = await requireContext(gateway);
   const period = getLedgerPeriodFromStart(periodKey, context.ledger.periodStartDay);
-  if (!period) throw new StatisticsQueryError("잘못된 통계 기간입니다.");
+  if (!period) throw new StatisticsPeriodError("잘못된 통계 기간입니다.");
   const type: TransactionType = requestedType === "income" ? "income" : "expense";
   const filters: TransactionFilters = {
     startOn: period.startOn,

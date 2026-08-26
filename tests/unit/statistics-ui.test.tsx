@@ -1,8 +1,14 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
+import { StatisticsDetailScreen } from "@/features/statistics/detail-screen";
 import { StatisticsOverviewScreen } from "@/features/statistics/overview-screen";
-import type { StatisticsOverviewData } from "@/features/statistics/types";
+import type { StatisticsDetailData, StatisticsOverviewData } from "@/features/statistics/types";
+import type { TransactionPage } from "@/features/transactions/types";
+
+vi.mock("next/navigation", () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
 
 const overviewFixture: StatisticsOverviewData = {
   ledger: { id: "ledger-1", name: "내 장부", periodStartDay: 10 },
@@ -37,6 +43,52 @@ const overviewFixture: StatisticsOverviewData = {
   ],
 };
 
+const detailFixture: StatisticsDetailData = {
+  ledger: overviewFixture.ledger,
+  period: overviewFixture.periods[0],
+  type: "expense",
+  categories: [
+    { categoryId: "food", name: "식비", color: "#F97316", amountTotal: 30000, ratio: 75, sortOrder: 1 },
+    { categoryId: "hobby", name: "취미", color: "#8B5CF6", amountTotal: 10000, ratio: 25, sortOrder: 2 },
+  ],
+  typeTotal: 40000,
+  filters: {
+    startOn: "2026-08-10",
+    endOn: "2026-09-09",
+    endExclusive: "2026-09-10",
+    query: "",
+    type: "expense",
+    categoryId: null,
+    sort: "newest",
+  },
+  page: {
+    items: [{
+      id: "33333333-3333-4333-8333-333333333333",
+      type: "expense",
+      occurredOn: "2026-08-26",
+      description: "점심",
+      amount: 30000,
+      memo: "",
+      category: { id: "food", name: "식비", color: "#F97316", type: "expense" },
+      createdAt: "2026-08-26T01:00:00.000Z",
+    }],
+    nextCursor: null,
+  },
+};
+
+let observerCallback: IntersectionObserverCallback | null = null;
+
+class FakeIntersectionObserver {
+  constructor(callback: IntersectionObserverCallback) { observerCallback = callback; }
+  observe() {}
+  unobserve() {}
+  disconnect() {}
+  root = null;
+  rootMargin = "0px";
+  thresholds = [0];
+  takeRecords() { return []; }
+}
+
 describe("StatisticsOverviewScreen", () => {
   afterEach(cleanup);
 
@@ -60,5 +112,46 @@ describe("StatisticsOverviewScreen", () => {
     render(<StatisticsOverviewScreen data={overviewFixture} />);
     expect(screen.getByRole("link", { name: /2026년 7월 10일.*기록 없음/ })).toBeVisible();
     expect(screen.getByText("차액 -200,000원")).toBeVisible();
+  });
+});
+
+describe("StatisticsDetailScreen", () => {
+  beforeEach(() => {
+    observerCallback = null;
+    vi.stubGlobal("IntersectionObserver", FakeIntersectionObserver);
+  });
+
+  afterEach(() => {
+    cleanup();
+    vi.unstubAllGlobals();
+  });
+
+  it("shows category ratios, a type switch, and read-only source transactions", () => {
+    render(<StatisticsDetailScreen initialData={detailFixture} />);
+    expect(screen.getByRole("heading", { name: "분류별 지출" })).toBeVisible();
+    const categories = screen.getByRole("region", { name: "분류별 지출 비율" });
+    expect(within(categories).getByText("식비")).toBeVisible();
+    expect(within(categories).getByText("75%")).toBeVisible();
+    expect(screen.getByRole("link", { name: "수입" })).toHaveAttribute("href", "?type=income");
+    expect(screen.getByRole("region", { name: "거래 내역" })).toBeVisible();
+    expect(screen.queryByRole("button", { name: /점심/ })).not.toBeInTheDocument();
+  });
+
+  it("loads the next source page once when the sentinel enters view", async () => {
+    const nextItem = { ...detailFixture.page.items[0], id: "44444444-4444-4444-8444-444444444444", description: "저녁" };
+    const loadPage = vi.fn<() => Promise<TransactionPage>>().mockResolvedValue({ items: [nextItem], nextCursor: null });
+    render(
+      <StatisticsDetailScreen
+        initialData={{ ...detailFixture, page: { ...detailFixture.page, nextCursor: "cursor-1" } }}
+        loadPage={loadPage}
+      />,
+    );
+
+    await act(async () => {
+      observerCallback?.([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver);
+    });
+    await waitFor(() => expect(screen.getAllByText("저녁").length).toBeGreaterThan(0));
+    expect(loadPage).toHaveBeenCalledTimes(1);
+    expect(screen.queryByText("모든 내역을 확인했어요")).not.toBeInTheDocument();
   });
 });
