@@ -8,6 +8,21 @@ exception
 end;
 $$;
 
+do $$
+begin
+  if exists (
+    select 1
+    from public.ledgers
+    group by owner_id, lower(btrim(name))
+    having count(*) > 1
+  ) then
+    raise exception using
+      errcode = '23505',
+      message = 'duplicate ledger names after trimming; resolve conflicts before migration';
+  end if;
+end;
+$$;
+
 update public.ledgers
 set name = btrim(name)
 where name <> btrim(name);
@@ -445,6 +460,34 @@ begin
 end;
 $$;
 
+create or replace function public.get_transaction_creator_profiles(
+  target_ledger_id uuid,
+  target_user_ids uuid[]
+)
+returns table (id uuid, display_name text)
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select profile.id, profile.display_name
+  from public.profiles as profile
+  where auth.uid() is not null
+    and exists (
+      select 1
+      from public.ledger_members as viewer_membership
+      where viewer_membership.ledger_id = target_ledger_id
+        and viewer_membership.user_id = auth.uid()
+    )
+    and profile.id = any(coalesce(target_user_ids, array[]::uuid[]))
+    and exists (
+      select 1
+      from public.transactions as transaction_row
+      where transaction_row.ledger_id = target_ledger_id
+        and transaction_row.created_by = profile.id
+    );
+$$;
+
 revoke all on table public.ledger_invitations from public, anon, authenticated;
 grant select on table public.ledger_invitations to authenticated;
 
@@ -460,6 +503,7 @@ revoke all on function public.revoke_ledger_invitation(uuid) from public, anon;
 revoke all on function public.remove_ledger_member(uuid, uuid) from public, anon;
 revoke all on function public.leave_shared_ledger(uuid) from public, anon;
 revoke all on function public.delete_shared_ledger(uuid, text) from public, anon;
+revoke all on function public.get_transaction_creator_profiles(uuid, uuid[]) from public, anon;
 revoke all on function private.reset_removed_member_default_ledger() from public, anon, authenticated;
 revoke all on function private.reset_deleted_ledger_defaults() from public, anon, authenticated;
 
@@ -472,3 +516,4 @@ grant execute on function public.revoke_ledger_invitation(uuid) to authenticated
 grant execute on function public.remove_ledger_member(uuid, uuid) to authenticated;
 grant execute on function public.leave_shared_ledger(uuid) to authenticated;
 grant execute on function public.delete_shared_ledger(uuid, text) to authenticated;
+grant execute on function public.get_transaction_creator_profiles(uuid, uuid[]) to authenticated;

@@ -61,10 +61,10 @@ async function listTransactions(
   const creatorIds = [...new Set(rows.map((row) => row.created_by))];
   const creatorNames = new Map<string, string>();
   if (creatorIds.length > 0) {
-    const { data: profiles, error: profileError } = await supabase
-      .from("profiles")
-      .select("id,display_name")
-      .in("id", creatorIds);
+    const { data: profiles, error: profileError } = await supabase.rpc(
+      "get_transaction_creator_profiles",
+      { target_ledger_id: ledgerId, target_user_ids: creatorIds },
+    );
     if (profileError) throw new TransactionQueryError("작성자 정보를 불러오지 못했습니다.");
     for (const profile of profiles ?? []) creatorNames.set(profile.id, profile.display_name);
   }

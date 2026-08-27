@@ -88,6 +88,7 @@ describe("LedgerScreen", () => {
     expect(screen.getByTestId("expense-total")).toHaveTextContent("46,500원");
     expect(screen.getByTestId("balance-total")).toHaveTextContent("2,753,500원");
     expect(screen.queryByText("권혁 작성")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /점심/ })).toHaveLength(2);
     await user.click(screen.getAllByRole("button", { name: "내역 추가" })[0]);
     expect(screen.getByRole("dialog", { name: "내역 추가" })).toBeVisible();
   });
@@ -146,7 +147,7 @@ describe("LedgerScreen", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /점심/ }));
+    await user.click(screen.getAllByRole("button", { name: /점심/ })[0]);
     const dialog = screen.getByRole("dialog", { name: "내역 수정" });
     expect(within(dialog).getByRole("option", { name: "예전 식비" })).toBeInTheDocument();
     expect(within(dialog).getByLabelText("분류")).toHaveValue(inactiveCategory.id);
@@ -186,7 +187,7 @@ describe("LedgerScreen", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /점심/ }));
+    await user.click(screen.getAllByRole("button", { name: /점심/ })[0]);
     const dialog = screen.getByRole("dialog", { name: "내역 수정" });
     await user.click(within(dialog).getByRole("button", { name: "삭제" }));
     expect(await within(dialog).findByRole("alert")).toHaveTextContent("이 내역을 변경할 수 없습니다.");
@@ -204,7 +205,7 @@ describe("LedgerScreen", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /점심/ }));
+    await user.click(screen.getAllByRole("button", { name: /점심/ })[0]);
     const dialog = screen.getByRole("dialog", { name: "내역 수정" });
     await user.click(within(dialog).getByRole("button", { name: "삭제" }));
     expect(await within(dialog).findByRole("alert")).toHaveTextContent("휴지통으로 이동하지 못했습니다. 다시 시도해 주세요.");

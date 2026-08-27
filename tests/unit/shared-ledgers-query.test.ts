@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  isSharedLedgerSchemaMissing,
   mapInvitations,
   mapLedgerContext,
   mapMembers,
@@ -12,6 +13,12 @@ const personalId = "22222222-2222-4222-8222-222222222222";
 const sharedId = "33333333-3333-4333-8333-333333333333";
 
 describe("shared ledger query mapping", () => {
+  it("recognizes only missing shared-ledger schema errors for the rollout fallback", () => {
+    expect(isSharedLedgerSchemaMissing({ code: "PGRST205" })).toBe(true);
+    expect(isSharedLedgerSchemaMissing({ code: "42P01" })).toBe(true);
+    expect(isSharedLedgerSchemaMissing({ code: "42501" })).toBe(false);
+  });
+
   it("selects an accessible default ledger and sorts personal before shared ledgers", () => {
     const result = mapLedgerContext(
       userId,

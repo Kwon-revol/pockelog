@@ -2,6 +2,7 @@ import "server-only";
 
 import { getCurrentAppContext } from "@/features/ledgers/queries";
 import {
+  isSharedLedgerSchemaMissing,
   mapInvitations,
   mapMembers,
   type InvitationRow,
@@ -16,7 +17,7 @@ type InvitationQueryRow = Omit<InvitationRow, "ledger_name"> & {
   ledger: { name: string };
 };
 
-export async function getSharedLedgerPageData(now = new Date()): Promise<SharedLedgerPageData | null> {
+export async function getSharedLedgerPageData(now = new Date()): Promise<SharedLedgerPageData | null | undefined> {
   const context = await getCurrentAppContext();
   if (!context) return null;
   const supabase = await createServerClient();
@@ -32,6 +33,7 @@ export async function getSharedLedgerPageData(now = new Date()): Promise<SharedL
       .select("user_id,role,joined_at")
       .eq("ledger_id", context.currentLedger.id),
   ]);
+  if (isSharedLedgerSchemaMissing(invitationResult.error)) return undefined;
   if (invitationResult.error || memberResult.error) {
     throw new SharedLedgerQueryError("공동 장부 정보를 불러오지 못했습니다.");
   }

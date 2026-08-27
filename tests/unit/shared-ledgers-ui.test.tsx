@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -7,6 +7,9 @@ import {
   type SharedLedgerManagerActions,
 } from "@/features/shared-ledgers/shared-ledger-manager";
 import type { SharedLedgerPageData } from "@/features/shared-ledgers/types";
+
+const navigation = vi.hoisted(() => ({ push: vi.fn() }));
+vi.mock("next/navigation", () => ({ useRouter: () => navigation }));
 
 const ownerId = "11111111-1111-4111-8111-111111111111";
 const memberId = "22222222-2222-4222-8222-222222222222";
@@ -59,7 +62,10 @@ const actions: SharedLedgerManagerActions = {
 };
 
 describe("SharedLedgerManager", () => {
-  beforeEach(() => vi.stubGlobal("confirm", vi.fn(() => true)));
+  beforeEach(() => {
+    navigation.push.mockReset();
+    vi.stubGlobal("confirm", vi.fn(() => true));
+  });
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
@@ -98,6 +104,26 @@ describe("SharedLedgerManager", () => {
     expect(screen.queryByLabelText("초대할 아이디 또는 이메일")).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "참여자 제거" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "공동 장부 삭제" })).not.toBeInTheDocument();
+  });
+
+  it("moves to the ledger after leaving or deleting a shared ledger", async () => {
+    const user = userEvent.setup();
+    const { unmount } = render(<SharedLedgerManager actions={actions} data={{
+      ...data,
+      currentLedger: { ...data.currentLedger, role: "member" },
+      sentInvitations: [],
+    }} />);
+
+    await user.click(screen.getByRole("button", { name: "이 장부 나가기" }));
+    await waitFor(() => expect(navigation.push).toHaveBeenCalledWith("/ledger"));
+    unmount();
+    navigation.push.mockReset();
+
+    render(<SharedLedgerManager actions={actions} data={data} />);
+    await user.click(screen.getAllByText("공동 장부 삭제")[0]);
+    await user.type(screen.getByLabelText("삭제 확인 장부 이름"), "우리 집");
+    await user.click(screen.getByRole("button", { name: "공동 장부 삭제" }));
+    await waitFor(() => expect(navigation.push).toHaveBeenCalledWith("/ledger"));
   });
 
   it("hides membership destruction controls for a personal ledger", () => {

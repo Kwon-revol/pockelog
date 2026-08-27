@@ -6,6 +6,10 @@ import type {
   LedgerMemberRole,
 } from "@/features/shared-ledgers/types";
 
+export function isSharedLedgerSchemaMissing(error: { code?: string } | null | undefined) {
+  return error?.code === "PGRST205" || error?.code === "42P01";
+}
+
 export type LedgerMembershipRow = {
   role: LedgerMemberRole;
   joined_at: string;

@@ -36,6 +36,18 @@ export async function createSupabaseSharedLedgerGateway(): Promise<SharedLedgerG
       return !error && data ? "updated" : isForbidden(error) || !data ? "forbidden" : "error";
     },
 
+    async canInviteToLedger(ledgerId, currentUserId) {
+      const { data, error } = await supabase
+        .from("ledgers")
+        .select("id")
+        .eq("id", ledgerId)
+        .eq("owner_id", currentUserId)
+        .eq("kind", "shared")
+        .maybeSingle();
+      if (error) return "error";
+      return data ? "allowed" : "forbidden";
+    },
+
     async resolveInvitationTarget(identifier, currentUserId) {
       const admin = createAdminClient();
       const { data, error } = await admin.rpc("resolve_invitation_target", {

@@ -36,6 +36,6 @@ export default async function SettingsPage() {
     if (!(error instanceof SettingsQueryError) && !(error instanceof SharedLedgerQueryError)) throw error;
     return <div className="rounded-3xl border border-rose-200 bg-white p-8 text-center shadow-sm"><h1 className="text-xl font-black text-slate-950">설정을 불러오지 못했어요</h1><p className="mt-2 text-sm text-slate-500">잠시 후 페이지를 새로고침해 주세요.</p></div>;
   }
-  if (!data || !sharedLedgerData) redirect("/login?next=%2Fsettings");
+  if (!data || sharedLedgerData === null) redirect("/login?next=%2Fsettings");
   return <SettingsScreen createCategoryAction={createCategoryAction} data={data} logoutAction={logoutAction} moveCategoryAction={moveCategoryAction} setCategoryActiveAction={setCategoryActiveAction} sharedLedgerActions={{ createAction: createSharedLedgerAction, inviteAction: inviteLedgerMemberAction, respondAction: respondToInvitationAction, revokeAction: revokeInvitationAction, removeAction: removeLedgerMemberAction, leaveAction: leaveSharedLedgerAction, deleteAction: deleteSharedLedgerAction }} sharedLedgerData={sharedLedgerData} updateCategoryAction={updateCategoryAction} updateLedgerAction={updateLedgerSettingsAction} />;
 }

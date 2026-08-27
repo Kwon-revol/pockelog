@@ -26,7 +26,7 @@ async function signUp(page: Page, values: { handle: string; name: string; email:
 async function selectVisibleLedger(page: Page, label: string) {
   const selector = page.locator('select[aria-label="현재 장부"]:visible');
   await selector.selectOption({ label });
-  await expect(selector).toHaveValue(/.+/);
+  await expect(selector.locator("option:checked")).toHaveText(label);
 }
 
 async function addExpense(page: Page, testInfo: TestInfo, description: string) {
@@ -46,8 +46,8 @@ test.describe("호스팅된 개발 Supabase 공동 장부", () => {
   test("두 사용자가 초대받아 기록하고 참여자는 다른 사용자의 내역을 수정하지 못한다", async ({ browser }, testInfo) => {
     await verifyHostedSupabaseE2ESafety();
     const unique = `${Date.now()}${testInfo.workerIndex}`;
-    const owner = { handle: `sl_owner_${unique}`, name: "공동 소유자", email: `sl_owner_${unique}@example.com`, phone: "010-7000-1000" };
-    const member = { handle: `sl_member_${unique}`, name: "공동 참여자", email: `sl_member_${unique}@example.com`, phone: "010-7000-2000" };
+    const owner = { handle: `slo_${unique.slice(-12)}`, name: "공동 소유자", email: `sl_owner_${unique}@example.com`, phone: "010-7000-1000" };
+    const member = { handle: `slm_${unique.slice(-12)}`, name: "공동 참여자", email: `sl_member_${unique}@example.com`, phone: "010-7000-2000" };
     const ledgerName = `우리 장부 ${unique.slice(-5)}`;
     const mobile = testInfo.project.name === "mobile-chromium";
     const contextOptions = {

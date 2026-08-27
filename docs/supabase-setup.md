@@ -77,11 +77,15 @@ select
   to_regprocedure('public.create_shared_ledger(text)') is not null
     as create_shared_ledger_exists,
   to_regprocedure('public.respond_to_ledger_invitation(uuid,text)') is not null
-    as invitation_response_exists;
+    as invitation_response_exists,
+  to_regprocedure('public.get_transaction_creator_profiles(uuid,uuid[])') is not null
+    as transaction_creator_profiles_exists;
 ```
 
 `resolve_invitation_target(text)`는 비공개 로그인 식별자를 읽으므로 `service_role`에만 실행 권한이 있다.
 브라우저와 일반 장부·거래·통계 요청에는 `SUPABASE_SECRET_KEY`를 사용하지 않는다.
+같은 소유자의 장부 이름이 앞뒤 공백과 대소문자를 제외하고 중복되면 마이그레이션이 명확한 오류로 중단된다.
+이 경우 중복 이름을 먼저 바꾼 뒤 전체 마이그레이션을 다시 실행한다.
 
 ## Auth 설정
 

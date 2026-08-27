@@ -37,9 +37,14 @@ export async function deleteE2EUsersByEmail(emails: string[]) {
     process.env.SUPABASE_SECRET_KEY!,
     { auth: { persistSession: false, autoRefreshToken: false } },
   );
-  const { data, error } = await admin.auth.admin.listUsers({ perPage: 1000 });
-  if (error) throw new Error(`Unable to list E2E users: ${error.message}`);
-  const targets = data.users.filter((user) => user.email && emails.includes(user.email));
+  const targets = [];
+  const perPage = 1000;
+  for (let page = 1; ; page += 1) {
+    const { data, error } = await admin.auth.admin.listUsers({ page, perPage });
+    if (error) throw new Error(`Unable to list E2E users: ${error.message}`);
+    targets.push(...data.users.filter((user) => user.email && emails.includes(user.email)));
+    if (data.users.length < perPage) break;
+  }
   for (const user of targets) {
     const { error: deleteError } = await admin.auth.admin.deleteUser(user.id);
     if (deleteError) throw new Error(`Unable to delete E2E user: ${deleteError.message}`);

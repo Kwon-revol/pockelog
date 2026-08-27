@@ -93,12 +93,17 @@ export function TransactionList({
           <tbody>
             {items.map((item) => (
               <tr
-                className={`border-t border-slate-100 ${onEdit && item.canManage ? "cursor-pointer transition hover:bg-emerald-50/40" : ""}`}
+                className="border-t border-slate-100"
                 key={item.id}
-                onClick={onEdit && item.canManage ? () => onEdit(item) : undefined}
               >
                 <td className="px-5 py-4 text-slate-500">{item.occurredOn}</td>
-                <td className="px-5 py-4 font-bold text-slate-900">{item.description}</td>
+                <td className="px-5 py-4 font-bold text-slate-900">
+                  {onEdit && item.canManage ? (
+                    <button className="rounded-lg text-left font-bold outline-none hover:text-emerald-700 focus-visible:ring-2 focus-visible:ring-emerald-500" onClick={() => onEdit(item)} type="button">
+                      {item.description}
+                    </button>
+                  ) : item.description}
+                </td>
                 <td className="px-5 py-4">
                   <span className="inline-flex items-center gap-2"><span className="size-2 rounded-full" style={{ backgroundColor: item.category.color }} />{item.category.name}</span>
                 </td>

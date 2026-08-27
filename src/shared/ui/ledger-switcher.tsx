@@ -18,7 +18,6 @@ export function LedgerSwitcher({
   action: SwitchLedgerAction;
   compact?: boolean;
 }) {
-  const [selected, setSelected] = useState(currentLedger.id);
   const [message, setMessage] = useState("");
   const [pending, startTransition] = useTransition();
 
@@ -31,24 +30,20 @@ export function LedgerSwitcher({
           className={`mt-1 w-full rounded-xl border border-emerald-100 bg-white px-3 py-2 font-bold text-slate-900 outline-none focus:border-emerald-500 ${compact ? "max-w-48 text-xs" : "text-sm"}`}
           disabled={pending}
           onChange={(event) => {
-            const previous = selected;
             const next = event.target.value;
-            setSelected(next);
             setMessage("");
             startTransition(async () => {
               try {
                 const result = await action(next);
                 if (result.status === "error") {
-                  setSelected(previous);
                   setMessage(result.message ?? "장부를 전환하지 못했습니다.");
                 }
               } catch {
-                setSelected(previous);
                 setMessage("장부를 전환하지 못했습니다. 다시 시도해 주세요.");
               }
             });
           }}
-          value={selected}
+          value={currentLedger.id}
         >
           {ledgers.map((ledger) => (
             <option key={ledger.id} value={ledger.id}>

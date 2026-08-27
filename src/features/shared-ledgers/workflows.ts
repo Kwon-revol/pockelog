@@ -15,6 +15,7 @@ export interface SharedLedgerGateway {
   getUserId(): Promise<string | null>;
   createSharedLedger(name: string): Promise<CreateLedgerResult>;
   switchLedger(ledgerId: string): Promise<ChangeResult>;
+  canInviteToLedger(ledgerId: string, currentUserId: string): Promise<"allowed" | "forbidden" | "error">;
   resolveInvitationTarget(identifier: string, currentUserId: string): Promise<TargetResult>;
   createInvitation(ledgerId: string, targetUserId: string): Promise<InvitationCreateResult>;
   respondToInvitation(invitationId: string, response: "accept" | "decline"): Promise<InvitationResponseResult>;
@@ -25,6 +26,7 @@ export interface SharedLedgerGateway {
 }
 
 const FAILED = "공동 장부를 변경하지 못했습니다. 다시 시도해 주세요.";
+const INVITATION_FAILED = "초대를 보낼 수 없어요. 입력한 정보와 장부 권한을 확인해 주세요.";
 
 async function signedInUser(gateway: SharedLedgerGateway): Promise<string | SharedLedgerActionState> {
   try {
@@ -79,12 +81,14 @@ export function inviteLedgerMember(
 ): Promise<SharedLedgerActionState> {
   if (!idSchema.safeParse(input.ledgerId).success) return Promise.resolve({ status: "error", message: FAILED });
   return withUser(gateway, async (currentUserId) => {
+    const permission = await gateway.canInviteToLedger(input.ledgerId, currentUserId);
+    if (permission !== "allowed") return { status: "error", message: INVITATION_FAILED };
     const target = await gateway.resolveInvitationTarget(input.identifier, currentUserId);
     if (target.status !== "found") {
       const messages = {
-        not_found: "초대할 사용자를 찾지 못했어요.",
+        not_found: INVITATION_FAILED,
         self: "본인은 초대할 수 없어요.",
-        error: FAILED,
+        error: INVITATION_FAILED,
       } as const;
       return { status: "error", message: messages[target.status] };
     }

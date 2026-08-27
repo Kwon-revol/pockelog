@@ -1,6 +1,10 @@
 import "server-only";
 
-import { mapLedgerContext, type LedgerMembershipRow } from "@/features/shared-ledgers/query-utils";
+import {
+  isSharedLedgerSchemaMissing,
+  mapLedgerContext,
+  type LedgerMembershipRow,
+} from "@/features/shared-ledgers/query-utils";
 import type { AppLedgerContext } from "@/features/ledgers/types";
 import { createServerClient } from "@/shared/supabase/server";
 
@@ -25,7 +29,8 @@ export async function getCurrentAppContext(): Promise<AppLedgerContext | null> {
       .eq("status", "pending")
       .gt("expires_at", new Date().toISOString()),
   ]);
-  if (profileError || privateError || membershipResult.error || invitationResult.error) {
+  const invitationUnavailable = isSharedLedgerSchemaMissing(invitationResult.error);
+  if (profileError || privateError || membershipResult.error || (invitationResult.error && !invitationUnavailable)) {
     throw new LedgerContextError("장부 컨텍스트를 불러오지 못했습니다.");
   }
 
@@ -34,7 +39,7 @@ export async function getCurrentAppContext(): Promise<AppLedgerContext | null> {
     profile?.display_name ?? user.user_metadata.display_name ?? "사용자",
     privateProfile?.default_ledger_id ?? null,
     (membershipResult.data ?? []) as unknown as LedgerMembershipRow[],
-    invitationResult.count ?? 0,
+    invitationUnavailable ? 0 : invitationResult.count ?? 0,
   );
   if (!context) throw new LedgerContextError("사용 가능한 장부가 없습니다.");
 

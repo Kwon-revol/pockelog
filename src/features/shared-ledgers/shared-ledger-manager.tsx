@@ -1,6 +1,7 @@
 "use client";
 
-import { useActionState, useState, useTransition } from "react";
+import { useActionState, useEffect, useState, useTransition } from "react";
+import { useRouter } from "next/navigation";
 
 import { InvitationList } from "@/features/shared-ledgers/invitation-list";
 import { MemberList } from "@/features/shared-ledgers/member-list";
@@ -29,6 +30,7 @@ function ActionMessage({ state }: { state: SharedLedgerActionState }) {
 }
 
 export function SharedLedgerManager({ data, actions }: { data: SharedLedgerPageData; actions: SharedLedgerManagerActions }) {
+  const router = useRouter();
   const [createState, createFormAction] = useActionState(actions.createAction, initialSharedLedgerActionState);
   const [inviteState, inviteFormAction] = useActionState(actions.inviteAction, initialSharedLedgerActionState);
   const [deleteState, deleteFormAction] = useActionState(actions.deleteAction, initialSharedLedgerActionState);
@@ -37,11 +39,17 @@ export function SharedLedgerManager({ data, actions }: { data: SharedLedgerPageD
   const shared = data.currentLedger.kind === "shared";
   const owner = shared && data.currentLedger.role === "owner";
 
-  function run(action: () => Promise<SharedLedgerActionState>) {
+  useEffect(() => {
+    if (deleteState.status === "success") router.push("/ledger");
+  }, [deleteState.status, router]);
+
+  function run(action: () => Promise<SharedLedgerActionState>, navigateOnSuccess = false) {
     setResult(initialSharedLedgerActionState);
     startTransition(async () => {
       try {
-        setResult(await action());
+        const next = await action();
+        setResult(next);
+        if (navigateOnSuccess && next.status === "success") router.push("/ledger");
       } catch {
         setResult({ status: "error", message: "공동 장부를 변경하지 못했습니다. 다시 시도해 주세요." });
       }
@@ -74,7 +82,7 @@ export function SharedLedgerManager({ data, actions }: { data: SharedLedgerPageD
         </form> : null}
         <div className="mt-4"><MemberList canRemove={owner} disabled={pending} members={data.members} onRemove={(userId) => { if (window.confirm("이 구성원을 장부에서 제거할까요?")) run(() => actions.removeAction(data.currentLedger.id, userId)); }} /></div>
         {owner && data.sentInvitations.length ? <div className="mt-5"><h4 className="mb-3 text-sm font-black text-slate-700">보낸 초대</h4><InvitationList disabled={pending} invitations={data.sentInvitations} mode="sent" onRevoke={(id) => run(() => actions.revokeAction(id))} /></div> : null}
-        {owner ? <details className="mt-6 rounded-2xl border border-rose-200 bg-rose-50/40 p-4"><summary className="cursor-pointer text-sm font-black text-rose-700">공동 장부 삭제</summary><p className="mt-3 text-xs leading-5 text-rose-700">거래와 분류를 포함한 모든 데이터가 영구 삭제됩니다. 장부 이름을 정확히 입력해 주세요.</p><form action={deleteFormAction} className="mt-3 space-y-3"><input name="ledgerId" type="hidden" value={data.currentLedger.id} /><input aria-label="삭제 확인 장부 이름" className="w-full rounded-2xl border border-rose-200 bg-white px-4 py-3" name="confirmationName" required /><SubmitButton>공동 장부 삭제</SubmitButton><ActionMessage state={deleteState} /></form></details> : <button className="mt-6 rounded-2xl border border-rose-200 px-4 py-3 text-sm font-bold text-rose-700 disabled:opacity-50" disabled={pending} onClick={() => { if (window.confirm("이 공동 장부에서 나갈까요?")) run(() => actions.leaveAction(data.currentLedger.id)); }} type="button">이 장부 나가기</button>}
+        {owner ? <details className="mt-6 rounded-2xl border border-rose-200 bg-rose-50/40 p-4"><summary className="cursor-pointer text-sm font-black text-rose-700">공동 장부 삭제</summary><p className="mt-3 text-xs leading-5 text-rose-700">거래와 분류를 포함한 모든 데이터가 영구 삭제됩니다. 장부 이름을 정확히 입력해 주세요.</p><form action={deleteFormAction} className="mt-3 space-y-3"><input name="ledgerId" type="hidden" value={data.currentLedger.id} /><input aria-label="삭제 확인 장부 이름" className="w-full rounded-2xl border border-rose-200 bg-white px-4 py-3" name="confirmationName" required /><SubmitButton>공동 장부 삭제</SubmitButton><ActionMessage state={deleteState} /></form></details> : <button className="mt-6 rounded-2xl border border-rose-200 px-4 py-3 text-sm font-bold text-rose-700 disabled:opacity-50" disabled={pending} onClick={() => { if (window.confirm("이 공동 장부에서 나갈까요?")) run(() => actions.leaveAction(data.currentLedger.id), true); }} type="button">이 장부 나가기</button>}
       </div> : null}
       <ActionMessage state={result} />
     </section>

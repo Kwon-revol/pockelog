@@ -55,4 +55,22 @@ describe("AppShell", () => {
     await user.selectOptions(selectors[0], "22222222-2222-4222-8222-222222222222");
     expect(switchLedgerAction).toHaveBeenCalledWith("22222222-2222-4222-8222-222222222222");
   });
+
+  it("keeps both responsive ledger selectors synchronized with server props", () => {
+    const personal = { id: "11111111-1111-4111-8111-111111111111", name: "내 장부", kind: "personal" as const, role: "owner" as const };
+    const shared = { id: "22222222-2222-4222-8222-222222222222", name: "우리 집", kind: "shared" as const, role: "member" as const };
+    const props = {
+      ledgers: [personal, shared],
+      pendingInvitationCount: 0,
+      switchLedgerAction: async () => ({ status: "success" as const }),
+      userName: "권혁",
+    };
+    const { rerender } = render(<AppShell {...props} currentLedger={personal}><h1>내용</h1></AppShell>);
+
+    rerender(<AppShell {...props} currentLedger={shared}><h1>내용</h1></AppShell>);
+
+    for (const selector of screen.getAllByRole("combobox", { name: "현재 장부" })) {
+      expect(selector).toHaveValue(shared.id);
+    }
+  });
 });

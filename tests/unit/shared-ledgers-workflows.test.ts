@@ -22,6 +22,7 @@ function gateway(overrides: Partial<SharedLedgerGateway> = {}): SharedLedgerGate
     async getUserId() { return userId; },
     async createSharedLedger() { return "created"; },
     async switchLedger() { return "updated"; },
+    async canInviteToLedger() { return "allowed"; },
     async resolveInvitationTarget() { return { status: "found", userId: targetId }; },
     async createInvitation() { return "created"; },
     async respondToInvitation() { return "accepted"; },
@@ -60,7 +61,8 @@ describe("shared ledger workflows", () => {
   });
 
   it.each([
-    ["not_found", "초대할 사용자를 찾지 못했어요."],
+    ["not_found", "초대를 보낼 수 없어요. 입력한 정보와 장부 권한을 확인해 주세요."],
+    ["error", "초대를 보낼 수 없어요. 입력한 정보와 장부 권한을 확인해 주세요."],
     ["self", "본인은 초대할 수 없어요."],
   ] as const)("maps target resolution result %s", async (status, message) => {
     const result = await inviteLedgerMember(
@@ -68,6 +70,23 @@ describe("shared ledger workflows", () => {
       gateway({ async resolveInvitationTarget() { return { status }; } }),
     );
     expect(result).toEqual({ status: "error", message });
+  });
+
+  it("checks shared-ledger ownership before resolving a private account identifier", async () => {
+    let resolved = false;
+    const result = await inviteLedgerMember(
+      { ledgerId, identifier: "target_user" },
+      gateway({
+        async canInviteToLedger() { return "forbidden"; },
+        async resolveInvitationTarget() { resolved = true; return { status: "found", userId: targetId }; },
+      }),
+    );
+
+    expect(resolved).toBe(false);
+    expect(result).toEqual({
+      status: "error",
+      message: "초대를 보낼 수 없어요. 입력한 정보와 장부 권한을 확인해 주세요.",
+    });
   });
 
   it.each([
