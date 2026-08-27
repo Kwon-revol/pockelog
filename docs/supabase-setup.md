@@ -62,6 +62,27 @@ select to_regprocedure('public.set_category_order(uuid,transaction_type,uuid[])'
 이 경우 중복 분류를 먼저 정리한 뒤 다시 실행한다. 그 밖의 실행 중 오류는 전체 파일을 다시 실행하기 전에
 Database의 Functions에서 `set_category_order` 존재 여부를 먼저 확인한다.
 
+## 공동 장부 마이그레이션 적용
+
+설정 마이그레이션까지 적용된 프로젝트에서 공동 장부 코드 배포 전에
+`supabase/migrations/202608270005_shared_ledgers.sql`을 SQL Editor에 한 번 실행한다.
+이 마이그레이션은 앱 내부 초대, 구성원 변경, 탈퇴·삭제 후 개인 장부 복구 함수와 RLS를 추가한다.
+
+실행 후 아래 값이 모두 `true`인지 확인한다.
+
+```sql
+select
+  to_regclass('public.ledger_invitations') is not null
+    as ledger_invitations_exists,
+  to_regprocedure('public.create_shared_ledger(text)') is not null
+    as create_shared_ledger_exists,
+  to_regprocedure('public.respond_to_ledger_invitation(uuid,text)') is not null
+    as invitation_response_exists;
+```
+
+`resolve_invitation_target(text)`는 비공개 로그인 식별자를 읽으므로 `service_role`에만 실행 권한이 있다.
+브라우저와 일반 장부·거래·통계 요청에는 `SUPABASE_SECRET_KEY`를 사용하지 않는다.
+
 ## Auth 설정
 
 - 초기 개발 중에는 **Confirm email**을 끈다.
@@ -96,7 +117,15 @@ Database의 Functions에서 `set_category_order` 존재 여부를 먼저 확인�
 - 누락·중복·다른 장부·다른 유형 분류가 섞인 순서 입력 거부
 - 로그인 사용자의 기존 장부·분류 RLS를 그대로 적용하는 실행 권한
 
+다섯 번째 마이그레이션은 다음을 추가한다.
+
+- 공동 장부 생성과 기본 분류 초기화 함수
+- 기존 가입자 대상 7일짜리 앱 내부 초대와 초대 RLS
+- 초대 수락·거절·취소, 구성원 제거, 나가기, 공동 장부 삭제 함수
+- 접근권한 상실 시 사용자의 개인 장부로 기본 장부를 복구하는 트리거
+- 서비스 역할만 호출할 수 있는 초대 대상 식별 함수
+
 `tests/db/`의 pgTAP 테스트는 추후 Docker 또는 CI 기반 Supabase 테스트 환경을 추가할 때 실행한다.
-현재 방식에서는 전용 개발 Supabase에 네 마이그레이션을 적용한 뒤 파괴적 E2E 안전 표시를
+현재 방식에서는 전용 개발 Supabase에 다섯 마이그레이션을 적용한 뒤 파괴적 E2E 안전 표시를
 켠 경우에만 `tests/e2e/ledger.spec.ts`, `tests/e2e/statistics.spec.ts`, `tests/e2e/settings.spec.ts`를 실행한다. 운영 프로젝트의
 `private.project_settings.allow_destructive_e2e`는 항상 `false`로 유지한다.
