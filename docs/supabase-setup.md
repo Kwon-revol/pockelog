@@ -44,6 +44,22 @@ select
 두 번째와 세 번째 SQL도 같은 프로젝트에서 반복 실행하지 않는다. `type already exists`나 `relation already exists` 같은 오류가
 발생했을 때 전체 파일을 다시 실행하지 말고, 먼저 Tables와 Functions에서 적용 여부를 확인한다.
 
+## 설정 마이그레이션 적용
+
+통계 마이그레이션까지 적용된 프로젝트에서 앱 설정 코드 병합 전에
+`supabase/migrations/202608270004_settings.sql`을 SQL Editor에 한 번 실행한다.
+이 마이그레이션은 장부 소유자가 한 유형의 전체 분류 순서를 원자적으로 바꾸는 함수를 추가한다.
+
+실행 후 아래 값이 `true`인지 확인한다.
+
+```sql
+select to_regprocedure('public.set_category_order(uuid,transaction_type,uuid[])') is not null
+  as category_order_function_exists;
+```
+
+네 번째 SQL도 같은 프로젝트에서 반복 실행하지 않는다. 실행 중 오류가 나면 전체 파일을 다시 실행하기 전에
+Database의 Functions에서 `set_category_order` 존재 여부를 먼저 확인한다.
+
 ## Auth 설정
 
 - 초기 개발 중에는 **Confirm email**을 끈다.
@@ -72,7 +88,13 @@ select
 - 선택 기간과 유형을 분류별로 합산하는 집계 함수
 - 로그인 사용자의 기존 장부 RLS를 그대로 적용하는 실행 권한
 
+네 번째 마이그레이션은 다음을 추가한다.
+
+- 소유자만 호출할 수 있는 분류 순서 일괄 변경 함수
+- 누락·중복·다른 장부·다른 유형 분류가 섞인 순서 입력 거부
+- 로그인 사용자의 기존 장부·분류 RLS를 그대로 적용하는 실행 권한
+
 `tests/db/`의 pgTAP 테스트는 추후 Docker 또는 CI 기반 Supabase 테스트 환경을 추가할 때 실행한다.
-현재 방식에서는 전용 개발 Supabase에 세 마이그레이션을 적용한 뒤 파괴적 E2E 안전 표시를
+현재 방식에서는 전용 개발 Supabase에 네 마이그레이션을 적용한 뒤 파괴적 E2E 안전 표시를
 켠 경우에만 `tests/e2e/ledger.spec.ts`와 `tests/e2e/statistics.spec.ts`를 실행한다. 운영 프로젝트의
 `private.project_settings.allow_destructive_e2e`는 항상 `false`로 유지한다.
