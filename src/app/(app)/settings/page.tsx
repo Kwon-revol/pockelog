@@ -1,23 +1,27 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
 import { logoutAction } from "@/features/auth/actions";
+import {
+  createCategoryAction,
+  moveCategoryAction,
+  setCategoryActiveAction,
+  updateCategoryAction,
+  updateLedgerSettingsAction,
+} from "@/features/settings/actions";
+import { getSettingsPageData, SettingsQueryError } from "@/features/settings/queries";
+import { SettingsScreen } from "@/features/settings/settings-screen";
 
 export const metadata: Metadata = { title: "설정" };
 
-export default function SettingsPage() {
-  return (
-    <div className="space-y-8">
-      <header><p className="text-sm font-semibold text-emerald-700">내 장부 관리</p><h1 className="mt-1 text-3xl font-black tracking-tight">설정</h1></header>
-      <section className="overflow-hidden rounded-3xl border border-slate-200 bg-white shadow-sm">
-        {[["장부 기준일", "매월 1일 ~ 말일"], ["분류 관리", "수입·지출 분류 추가 및 숨기기"], ["장부 구성원", "현재 나만 사용 중"], ["계정 설정", "사용자명과 연락처 관리"]].map(([title, description]) => (
-          <button className="flex w-full items-center justify-between border-b border-slate-100 px-6 py-5 text-left last:border-0 hover:bg-slate-50" key={title} type="button">
-            <span><strong className="block text-sm text-slate-900">{title}</strong><span className="mt-1 block text-sm text-slate-500">{description}</span></span><span aria-hidden="true" className="text-slate-400">›</span>
-          </button>
-        ))}
-      </section>
-      <form action={logoutAction}>
-        <button className="rounded-2xl border border-rose-200 px-5 py-3 text-sm font-bold text-rose-700 hover:bg-rose-50" type="submit">로그아웃</button>
-      </form>
-    </div>
-  );
+export default async function SettingsPage() {
+  let data;
+  try {
+    data = await getSettingsPageData();
+  } catch (error) {
+    if (!(error instanceof SettingsQueryError)) throw error;
+    return <div className="rounded-3xl border border-rose-200 bg-white p-8 text-center shadow-sm"><h1 className="text-xl font-black text-slate-950">설정을 불러오지 못했어요</h1><p className="mt-2 text-sm text-slate-500">잠시 후 페이지를 새로고침해 주세요.</p></div>;
+  }
+  if (!data) redirect("/login?next=%2Fsettings");
+  return <SettingsScreen createCategoryAction={createCategoryAction} data={data} logoutAction={logoutAction} moveCategoryAction={moveCategoryAction} setCategoryActiveAction={setCategoryActiveAction} updateCategoryAction={updateCategoryAction} updateLedgerAction={updateLedgerSettingsAction} />;
 }
