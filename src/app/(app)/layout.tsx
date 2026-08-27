@@ -7,5 +7,5 @@ export default async function ProtectedAppLayout({ children }: Readonly<{ childr
   const context = await getCurrentAppContext();
   if (!context) redirect("/login");
 
-  return <AppShell ledgerName={context.ledgerName} userName={context.userName}>{children}</AppShell>;
+  return <AppShell ledgerName={context.currentLedger.name} userName={context.userName}>{children}</AppShell>;
 }

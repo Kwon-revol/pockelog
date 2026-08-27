@@ -15,6 +15,7 @@ export type LedgerInvitation = {
   ledgerId: string;
   ledgerName: string;
   targetUserId: string;
+  targetName: string;
   invitedByName: string;
   status: InvitationStatus;
   expiresAt: string;

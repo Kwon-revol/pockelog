@@ -2,7 +2,7 @@ begin;
 set local search_path = public, extensions;
 
 create extension if not exists pgtap with schema extensions;
-select plan(19);
+select plan(21);
 
 select has_table('public', 'ledger_invitations', '공동 장부 초대 테이블이 존재한다');
 select has_function('public', 'create_shared_ledger', array['text'], '공동 장부 생성 함수가 존재한다');
@@ -136,11 +136,22 @@ select throws_ok(
   '같은 대상의 대기 초대는 하나만 허용한다'
 );
 
+select is(
+  (select count(*)::integer from public.profiles where id = '60000000-0000-0000-0000-000000000002'),
+  1,
+  '초대한 소유자는 초대 대상의 표시 이름을 볼 수 있다'
+);
+
 select set_config('request.jwt.claim.sub', '60000000-0000-0000-0000-000000000003', true);
 select is(
   (select count(*)::integer from public.ledger_invitations where id = current_setting('tests.shared_invitation')::uuid),
   0,
   '관계없는 사용자는 초대를 볼 수 없다'
+);
+select is(
+  (select count(*)::integer from public.profiles where id = '60000000-0000-0000-0000-000000000002'),
+  0,
+  '관계없는 사용자는 초대 대상 프로필을 볼 수 없다'
 );
 
 select set_config('request.jwt.claim.sub', '60000000-0000-0000-0000-000000000002', true);

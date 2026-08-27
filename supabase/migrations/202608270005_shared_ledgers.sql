@@ -52,6 +52,36 @@ create index if not exists ledger_invitations_target_status_index
 create index if not exists ledger_invitations_ledger_status_index
   on public.ledger_invitations (ledger_id, status, expires_at);
 
+create or replace function public.has_ledger_invitation_with(other_user_id uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = ''
+as $$
+  select exists (
+    select 1
+    from public.ledger_invitations as invitation
+    join public.ledgers as ledger on ledger.id = invitation.ledger_id
+    where invitation.status = 'pending'
+      and invitation.expires_at > now()
+      and (
+        (ledger.owner_id = auth.uid() and invitation.target_user_id = other_user_id)
+        or (invitation.target_user_id = auth.uid() and ledger.owner_id = other_user_id)
+      )
+  );
+$$;
+
+drop policy if exists profiles_select_shared_members on public.profiles;
+create policy profiles_select_shared_members
+on public.profiles for select
+to authenticated
+using (
+  id = auth.uid()
+  or public.shares_ledger_with(id)
+  or public.has_ledger_invitation_with(id)
+);
+
 alter table public.ledger_invitations enable row level security;
 
 drop policy if exists ledger_invitations_select_parties on public.ledger_invitations;
@@ -422,6 +452,7 @@ revoke insert, delete on table public.ledgers from authenticated;
 revoke insert, delete on table public.ledger_members from authenticated;
 
 revoke all on function public.create_shared_ledger(text) from public, anon;
+revoke all on function public.has_ledger_invitation_with(uuid) from public, anon;
 revoke all on function public.resolve_invitation_target(text) from public, anon, authenticated;
 revoke all on function public.create_ledger_invitation(uuid, uuid) from public, anon;
 revoke all on function public.respond_to_ledger_invitation(uuid, text) from public, anon;
@@ -433,6 +464,7 @@ revoke all on function private.reset_removed_member_default_ledger() from public
 revoke all on function private.reset_deleted_ledger_defaults() from public, anon, authenticated;
 
 grant execute on function public.create_shared_ledger(text) to authenticated;
+grant execute on function public.has_ledger_invitation_with(uuid) to authenticated;
 grant execute on function public.resolve_invitation_target(text) to service_role;
 grant execute on function public.create_ledger_invitation(uuid, uuid) to authenticated;
 grant execute on function public.respond_to_ledger_invitation(uuid, text) to authenticated;
