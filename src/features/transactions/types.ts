@@ -42,6 +42,8 @@ export type TransactionListItem = {
   amount: number;
   memo: string;
   category: CategoryOption;
+  createdBy: { id: string; name: string };
+  canManage: boolean;
   createdAt: string;
 };
 

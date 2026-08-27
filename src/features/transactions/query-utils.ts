@@ -14,8 +14,15 @@ export type TransactionRow = {
   description: string;
   amount: string | number;
   memo: string | null;
+  created_by: string;
   created_at: string;
   category: CategoryOption | CategoryOption[];
+};
+
+type TransactionViewer = {
+  currentUserId: string;
+  ownerId: string;
+  creatorNames: Map<string, string>;
 };
 
 export function buildCursorFilter(cursor: TransactionCursor, sort: TransactionSort) {
@@ -31,7 +38,7 @@ export function sanitizeSearchTerm(value: string) {
   return value.replace(/[(),]/g, " ").replace(/\s{2,}/g, " ").trim();
 }
 
-export function toTransactionPage(rows: TransactionRow[]): TransactionPage {
+export function toTransactionPage(rows: TransactionRow[], viewer: TransactionViewer): TransactionPage {
   const hasNext = rows.length > 50;
   const visible = rows.slice(0, 50);
   const items = visible.map((row) => ({
@@ -42,6 +49,11 @@ export function toTransactionPage(rows: TransactionRow[]): TransactionPage {
     amount: Number(row.amount),
     memo: row.memo ?? "",
     category: Array.isArray(row.category) ? row.category[0] : row.category,
+    createdBy: {
+      id: row.created_by,
+      name: viewer.creatorNames.get(row.created_by) ?? "알 수 없는 사용자",
+    },
+    canManage: viewer.currentUserId === viewer.ownerId || viewer.currentUserId === row.created_by,
     createdAt: row.created_at,
   }));
   const last = items.at(-1);

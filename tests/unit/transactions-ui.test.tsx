@@ -36,6 +36,8 @@ const fixture: LedgerPageData = {
       description: "점심",
       amount: 46500,
       memo: "",
+      createdBy: { id: "user-1", name: "권혁" },
+      canManage: true,
       category: { id: "11111111-1111-4111-8111-111111111111", name: "식비", color: "#F97316", type: "expense" },
       createdAt: "2026-08-26T01:00:00.000Z",
     }],
@@ -206,5 +208,27 @@ describe("LedgerScreen", () => {
     await user.click(within(dialog).getByRole("button", { name: "삭제" }));
     expect(await within(dialog).findByRole("alert")).toHaveTextContent("휴지통으로 이동하지 못했습니다. 다시 시도해 주세요.");
     expect(dialog).toBeVisible();
+  });
+
+  it("shows the creator and does not open another member's transaction", async () => {
+    const user = userEvent.setup();
+    const otherMemberItem = {
+      ...fixture.page.items[0],
+      createdBy: { id: "user-2", name: "민지" },
+      canManage: false,
+    };
+    render(
+      <LedgerScreen
+        initialData={{ ...fixture, page: { items: [otherMemberItem], nextCursor: null } }}
+        createAction={successAction}
+        updateAction={successAction}
+        trashAction={successAction}
+      />,
+    );
+
+    expect(screen.getAllByText("민지 작성").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: /점심/ })).not.toBeInTheDocument();
+    await user.click(screen.getAllByText("점심")[0]);
+    expect(screen.queryByRole("dialog", { name: "내역 수정" })).not.toBeInTheDocument();
   });
 });

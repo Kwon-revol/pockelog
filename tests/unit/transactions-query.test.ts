@@ -36,6 +36,7 @@ describe("transaction query boundaries", () => {
       description: `내역 ${index + 1}`,
       amount: "1000",
       memo: null,
+      created_by: index === 0 ? "user-2" : "user-1",
       created_at: `2026-08-26T01:02:${String(index).padStart(2, "0")}.000Z`,
       category: {
         id: "22222222-2222-4222-8222-222222222222",
@@ -45,9 +46,43 @@ describe("transaction query boundaries", () => {
       },
     }));
 
-    const page = toTransactionPage(rows);
+    const page = toTransactionPage(rows, {
+      currentUserId: "user-1",
+      ownerId: "owner-1",
+      creatorNames: new Map([["user-1", "권혁"], ["user-2", "민지"]]),
+    });
     expect(page.items).toHaveLength(50);
     expect(page.items.at(-1)?.description).toBe("내역 50");
     expect(page.nextCursor).not.toBeNull();
+    expect(page.items[0]).toMatchObject({
+      createdBy: { id: "user-2", name: "민지" },
+      canManage: false,
+    });
+    expect(page.items[1]).toMatchObject({
+      createdBy: { id: "user-1", name: "권혁" },
+      canManage: true,
+    });
+  });
+
+  it("lets the ledger owner manage another member's transaction", () => {
+    const row = {
+      id: "33333333-3333-4333-8333-333333333333",
+      type: "expense" as const,
+      occurred_on: "2026-08-26",
+      description: "공동 장보기",
+      amount: 10000,
+      memo: null,
+      created_by: "user-2",
+      created_at: "2026-08-26T01:00:00.000Z",
+      category: { id: "category-1", name: "식비", color: "#F97316", type: "expense" as const },
+    };
+
+    const page = toTransactionPage([row], {
+      currentUserId: "owner-1",
+      ownerId: "owner-1",
+      creatorNames: new Map([["user-2", "민지"]]),
+    });
+
+    expect(page.items[0].canManage).toBe(true);
   });
 });

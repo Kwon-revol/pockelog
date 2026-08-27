@@ -31,11 +31,13 @@ async function listTransactions(
   ledgerId: string,
   filters: TransactionFilters,
   cursor: TransactionCursor | null,
+  currentUserId: string,
+  ownerId: string,
 ): Promise<TransactionPage> {
   const ascending = filters.sort === "oldest";
   let query = supabase
     .from("transactions")
-    .select("id,type,occurred_on,description,amount,memo,created_at,category:categories!transactions_category_id_fkey(id,name,color,type)")
+    .select("id,type,occurred_on,description,amount,memo,created_by,created_at,category:categories!transactions_category_id_fkey(id,name,color,type)")
     .eq("ledger_id", ledgerId)
     .gte("occurred_on", filters.startOn)
     .lt("occurred_on", filters.endExclusive)
@@ -55,7 +57,18 @@ async function listTransactions(
 
   const { data, error } = await query;
   if (error) throw new TransactionQueryError("거래 목록을 불러오지 못했습니다.");
-  return toTransactionPage((data ?? []) as unknown as TransactionRow[]);
+  const rows = (data ?? []) as unknown as TransactionRow[];
+  const creatorIds = [...new Set(rows.map((row) => row.created_by))];
+  const creatorNames = new Map<string, string>();
+  if (creatorIds.length > 0) {
+    const { data: profiles, error: profileError } = await supabase
+      .from("profiles")
+      .select("id,display_name")
+      .in("id", creatorIds);
+    if (profileError) throw new TransactionQueryError("작성자 정보를 불러오지 못했습니다.");
+    for (const profile of profiles ?? []) creatorNames.set(profile.id, profile.display_name);
+  }
+  return toTransactionPage(rows, { currentUserId, ownerId, creatorNames });
 }
 
 async function getSummary(
@@ -83,11 +96,11 @@ async function getLedger(
 ) {
   const { data, error } = await supabase
     .from("ledgers")
-    .select("id,name,period_start_day")
+    .select("id,name,period_start_day,owner_id")
     .eq("id", ledgerId)
     .maybeSingle();
   if (error || !data) throw new TransactionQueryError("기본 장부를 불러오지 못했습니다.");
-  return { id: data.id, name: data.name, periodStartDay: data.period_start_day };
+  return { id: data.id, name: data.name, periodStartDay: data.period_start_day, ownerId: data.owner_id };
 }
 
 async function getCategories(
@@ -120,10 +133,16 @@ export async function getLedgerPageData(
   );
   const [categories, page, summary] = await Promise.all([
     getCategories(supabase, ledger.id),
-    listTransactions(supabase, ledger.id, filters, null),
+    listTransactions(supabase, ledger.id, filters, null, context.userId, ledger.ownerId),
     getSummary(supabase, ledger.id, filters),
   ]);
-  return { ledger, categories, filters, page, summary };
+  return {
+    ledger: { id: ledger.id, name: ledger.name, periodStartDay: ledger.periodStartDay },
+    categories,
+    filters,
+    page,
+    summary,
+  };
 }
 
 export async function getTransactionPageForCurrentUser(
@@ -135,7 +154,8 @@ export async function getTransactionPageForCurrentUser(
   const supabase = await createServerClient();
   const context = await resolveTransactionContext(supabase);
   if (!context) throw new TransactionAuthenticationError("로그인이 필요합니다.");
-  return listTransactions(supabase, context.ledgerId, filters, cursor);
+  const ledger = await getLedger(supabase, context.ledgerId);
+  return listTransactions(supabase, context.ledgerId, filters, cursor, context.userId, ledger.ownerId);
 }
 
 export async function getInitialTransactionPageForCurrentUser(
@@ -144,5 +164,6 @@ export async function getInitialTransactionPageForCurrentUser(
   const supabase = await createServerClient();
   const context = await resolveTransactionContext(supabase);
   if (!context) throw new TransactionAuthenticationError("로그인이 필요합니다.");
-  return listTransactions(supabase, context.ledgerId, filters, null);
+  const ledger = await getLedger(supabase, context.ledgerId);
+  return listTransactions(supabase, context.ledgerId, filters, null, context.userId, ledger.ownerId);
 }
