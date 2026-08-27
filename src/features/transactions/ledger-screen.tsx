@@ -1,96 +1,34 @@
 "use client";
 
-import { useCallback, useEffect, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useState } from "react";
 
 import { TransactionForm, type TransactionFormAction } from "@/features/transactions/transaction-form";
 import { TransactionList } from "@/features/transactions/transaction-list";
+import {
+  useTransactionPages,
+  type LoadTransactionPage,
+} from "@/features/transactions/use-transaction-pages";
 import type {
   LedgerPageData,
   TransactionActionState,
-  TransactionFilters,
   TransactionListItem,
-  TransactionPage,
 } from "@/features/transactions/types";
 
 type UpdateAction = (id: string, state: TransactionActionState, formData: FormData) => Promise<TransactionActionState>;
 type TrashAction = (id: string) => Promise<TransactionActionState>;
-type LoadPage = (filters: TransactionFilters, cursor: string) => Promise<TransactionPage>;
-
 const won = new Intl.NumberFormat("ko-KR");
-
-class SessionExpiredError extends Error {}
-
-async function fetchPage(filters: TransactionFilters, cursor: string) {
-  const params = new URLSearchParams({
-    cursor,
-    start: filters.startOn,
-    end: filters.endOn,
-    q: filters.query,
-    type: filters.type,
-    sort: filters.sort,
-  });
-  if (filters.categoryId) params.set("category", filters.categoryId);
-  const response = await fetch(`/api/transactions?${params}`);
-  if (response.status === 401) {
-    throw new SessionExpiredError("로그인이 필요합니다.");
-  }
-  if (!response.ok) throw new Error("내역을 불러오지 못했습니다.");
-  return response.json() as Promise<TransactionPage>;
-}
 
 type LedgerScreenProps = {
   initialData: LedgerPageData;
   createAction: TransactionFormAction;
   updateAction: UpdateAction;
   trashAction: TrashAction;
-  loadPage?: LoadPage;
+  loadPage?: LoadTransactionPage;
 };
 
-export function LedgerScreen({ initialData, createAction, updateAction, trashAction, loadPage = fetchPage }: LedgerScreenProps) {
-  const router = useRouter();
-  const [items, setItems] = useState(initialData.page.items);
-  const [nextCursor, setNextCursor] = useState(initialData.page.nextCursor);
+export function LedgerScreen({ initialData, createAction, updateAction, trashAction, loadPage }: LedgerScreenProps) {
   const [selected, setSelected] = useState<TransactionListItem | null | undefined>(undefined);
-  const [loading, setLoading] = useState(false);
-  const [loadError, setLoadError] = useState<string | null>(null);
-  const sentinelRef = useRef<HTMLDivElement>(null);
-  const requestInFlightRef = useRef(false);
-
-  const requestNextPage = useCallback(async () => {
-    if (!nextCursor || requestInFlightRef.current) return;
-    requestInFlightRef.current = true;
-    setLoading(true);
-    setLoadError(null);
-    try {
-      const page = await loadPage(initialData.filters, nextCursor);
-      setItems((current) => {
-        const known = new Set(current.map((item) => item.id));
-        return [...current, ...page.items.filter((item) => !known.has(item.id))];
-      });
-      setNextCursor(page.nextCursor);
-    } catch (error) {
-      if (error instanceof SessionExpiredError) {
-        const next = `${window.location.pathname}${window.location.search}`;
-        router.push(`/login?next=${encodeURIComponent(next)}`);
-      } else {
-        setLoadError("추가 내역을 불러오지 못했습니다.");
-      }
-    } finally {
-      requestInFlightRef.current = false;
-      setLoading(false);
-    }
-  }, [initialData.filters, loadPage, nextCursor, router]);
-
-  useEffect(() => {
-    const node = sentinelRef.current;
-    if (!node || !nextCursor || loading || loadError) return;
-    const observer = new IntersectionObserver((entries) => {
-      if (entries.some((entry) => entry.isIntersecting)) void requestNextPage();
-    }, { rootMargin: "240px" });
-    observer.observe(node);
-    return () => observer.disconnect();
-  }, [loadError, loading, nextCursor, requestNextPage]);
+  const pages = useTransactionPages(initialData.page, initialData.filters, loadPage);
 
   const editAction: TransactionFormAction = selected
     ? (state, formData) => updateAction(selected.id, state, formData)
@@ -131,7 +69,7 @@ export function LedgerScreen({ initialData, createAction, updateAction, trashAct
         <div className="flex items-end gap-2"><select aria-label="정렬" className="min-w-0 flex-1 rounded-xl border border-slate-200 bg-white px-3 py-2.5 text-sm" defaultValue={initialData.filters.sort} name="sort"><option value="newest">최신순</option><option value="oldest">오래된순</option></select><button className="rounded-xl bg-slate-900 px-4 py-2.5 text-sm font-bold text-white" type="submit">조회</button></div>
       </form>
 
-      {items.length === 0 ? (
+      {pages.items.length === 0 ? (
         <section className="rounded-3xl border border-slate-200/80 bg-white px-6 py-14 text-center shadow-sm">
           <div className="mx-auto flex size-14 items-center justify-center rounded-2xl bg-emerald-50 text-2xl">₩</div>
           <h2 className="mt-5 text-xl font-black text-slate-900">첫 내역을 기록해 보세요</h2>
@@ -139,7 +77,7 @@ export function LedgerScreen({ initialData, createAction, updateAction, trashAct
           <button className="mt-6 rounded-2xl border border-emerald-200 px-5 py-3 text-sm font-bold text-emerald-700" onClick={() => setSelected(null)} type="button">내역 추가</button>
         </section>
       ) : (
-        <TransactionList items={items} hasNext={Boolean(nextCursor)} loading={loading} error={loadError} sentinelRef={sentinelRef} onEdit={setSelected} onRetry={() => void requestNextPage()} />
+        <TransactionList items={pages.items} hasNext={pages.hasNext} loading={pages.loading} error={pages.loadError} sentinelRef={pages.sentinelRef} onEdit={setSelected} onRetry={() => void pages.requestNextPage()} />
       )}
 
       <button aria-label="내역 추가" className="fixed bottom-20 right-5 z-20 flex size-14 items-center justify-center rounded-full bg-emerald-600 text-3xl font-light text-white shadow-xl shadow-emerald-600/30 lg:hidden" onClick={() => setSelected(null)} type="button">+</button>

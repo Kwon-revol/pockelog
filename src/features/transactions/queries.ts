@@ -137,3 +137,12 @@ export async function getTransactionPageForCurrentUser(
   if (!context) throw new TransactionAuthenticationError("로그인이 필요합니다.");
   return listTransactions(supabase, context.ledgerId, filters, cursor);
 }
+
+export async function getInitialTransactionPageForCurrentUser(
+  filters: TransactionFilters,
+) {
+  const supabase = await createServerClient();
+  const context = await resolveTransactionContext(supabase);
+  if (!context) throw new TransactionAuthenticationError("로그인이 필요합니다.");
+  return listTransactions(supabase, context.ledgerId, filters, null);
+}
