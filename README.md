@@ -31,6 +31,8 @@ Docker는 필요하지 않습니다. 새 Supabase 프로젝트의 SQL Editor에�
 `supabase/migrations/202608260003_statistics.sql`을 한 번 실행해야 합니다.
 설정 기능을 배포하기 전에는 이어서
 `supabase/migrations/202608270004_settings.sql`을 한 번 실행해야 합니다.
+공동 장부 기능을 배포하기 전에는 마지막으로
+`supabase/migrations/202608270005_shared_ledgers.sql`을 한 번 실행해야 합니다.
 세부 순서와 확인 항목은 `docs/supabase-setup.md`에 정리되어 있습니다.
 
 초기 개발 중 이메일 인증을 끄면 가입 직후 개인 장부로 이동합니다. 이메일 인증을
@@ -54,7 +56,7 @@ npm run test:e2e
 ```
 
 `npm run test:e2e`는 기본적으로 로그인·회원가입 공개 화면만 검사합니다. 실제 계정을
-만들고 거래·통계·설정을 변경하는 E2E는 네 번째 마이그레이션까지 적용한 전용 개발 Supabase에서만
+만들고 거래·통계·설정·공동 장부를 변경하는 E2E는 다섯 번째 마이그레이션까지 적용한 전용 개발 Supabase에서만
 아래 값을 추가해 실행하세요.
 
 ```dotenv
@@ -73,5 +75,6 @@ where singleton = true;
 
 이 값은 운영 프로젝트에서는 항상 `false`로 유지하세요. 테스트 가입 직후 앱 화면을
 확인하므로 개발 프로젝트에서는 이메일 확인도 꺼야 합니다.
+공동 장부 E2E는 두 테스트 계정을 만든 뒤 안전 표시를 다시 확인하고 계정을 삭제합니다.
 
 제품 설계와 구현 계획은 `docs/superpowers/`에서 관리합니다.
