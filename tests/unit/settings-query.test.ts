@@ -1,5 +1,9 @@
 import { describe, expect, it } from "vitest";
 
+import {
+  mapCategoryUpdateResult,
+  resolveNextCategorySortOrder,
+} from "@/features/settings/gateway-utils";
 import { mapSettingsPageData } from "@/features/settings/query-utils";
 
 describe("settings query mapping", () => {
@@ -30,5 +34,21 @@ describe("settings query mapping", () => {
 
     expect(result.isOwner).toBe(false);
     expect(result.ledger.periodStartDay).toBeNull();
+  });
+});
+
+describe("settings gateway mapping", () => {
+  it("increments the last category order and stops when the lookup failed", () => {
+    expect(resolveNextCategorySortOrder({ sort_order: 4 }, null)).toBe(5);
+    expect(resolveNextCategorySortOrder(null, null)).toBe(0);
+    expect(resolveNextCategorySortOrder(null, { code: "PGRST001" })).toBeNull();
+  });
+
+  it("distinguishes missing rows, authorization failures, and server errors", () => {
+    expect(mapCategoryUpdateResult(null, true)).toBe("updated");
+    expect(mapCategoryUpdateResult(null, false)).toBe("forbidden");
+    expect(mapCategoryUpdateResult("42501", false)).toBe("forbidden");
+    expect(mapCategoryUpdateResult("23505", false)).toBe("duplicate");
+    expect(mapCategoryUpdateResult("XX000", false)).toBe("error");
   });
 });

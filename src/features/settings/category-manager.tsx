@@ -102,7 +102,16 @@ export function CategoryManager({
   const orderedIds = [...active, ...hidden].map((category) => category.id);
 
   function run(action: () => Promise<SettingsActionState>) {
-    startTransition(async () => setResult(await action()));
+    startTransition(async () => {
+      try {
+        setResult(await action());
+      } catch {
+        setResult({
+          status: "error",
+          message: "분류를 변경하지 못했습니다. 다시 시도해 주세요.",
+        });
+      }
+    });
   }
 
   return (
@@ -122,8 +131,8 @@ export function CategoryManager({
             {isOwner ? <div className="flex items-center gap-1">
               <button aria-label={`${category.name} 위로 이동`} className="rounded-lg px-2 py-1 text-slate-500 disabled:opacity-30" disabled={pending || index === 0} onClick={() => run(() => moveAction(category.id, "up", type, orderedIds))} type="button">↑</button>
               <button aria-label={`${category.name} 아래로 이동`} className="rounded-lg px-2 py-1 text-slate-500 disabled:opacity-30" disabled={pending || index === active.length - 1} onClick={() => run(() => moveAction(category.id, "down", type, orderedIds))} type="button">↓</button>
-              <button aria-label={`${category.name} 수정`} className="rounded-lg px-2 py-1 text-xs font-bold text-emerald-700" onClick={() => setEditor(category)} type="button">수정</button>
-              <button aria-label={`${category.name} 숨기기`} className="rounded-lg px-2 py-1 text-xs font-bold text-rose-600" onClick={() => { if (window.confirm(`${category.name} 분류를 숨길까요?`)) run(() => activeAction(category.id, false)); }} type="button">숨기기</button>
+              <button aria-label={`${category.name} 수정`} className="rounded-lg px-2 py-1 text-xs font-bold text-emerald-700 disabled:opacity-30" disabled={pending} onClick={() => setEditor(category)} type="button">수정</button>
+              <button aria-label={`${category.name} 숨기기`} className="rounded-lg px-2 py-1 text-xs font-bold text-rose-600 disabled:opacity-30" disabled={pending} onClick={() => { if (window.confirm(`${category.name} 분류를 숨길까요?`)) run(() => activeAction(category.id, false)); }} type="button">숨기기</button>
             </div> : null}
           </article>
         ))}

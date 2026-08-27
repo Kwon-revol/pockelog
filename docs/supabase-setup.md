@@ -48,7 +48,8 @@ select
 
 통계 마이그레이션까지 적용된 프로젝트에서 앱 설정 코드 병합 전에
 `supabase/migrations/202608270004_settings.sql`을 SQL Editor에 한 번 실행한다.
-이 마이그레이션은 장부 소유자가 한 유형의 전체 분류 순서를 원자적으로 바꾸는 함수를 추가한다.
+이 마이그레이션은 분류명의 앞뒤 공백을 정리하고 공백·대소문자만 다른 중복을 데이터베이스에서 차단하며,
+장부 소유자가 한 유형의 전체 분류 순서를 원자적으로 바꾸는 함수를 추가한다.
 
 실행 후 아래 값이 `true`인지 확인한다.
 
@@ -57,7 +58,8 @@ select to_regprocedure('public.set_category_order(uuid,transaction_type,uuid[])'
   as category_order_function_exists;
 ```
 
-네 번째 SQL도 같은 프로젝트에서 반복 실행하지 않는다. 실행 중 오류가 나면 전체 파일을 다시 실행하기 전에
+기존 데이터에 `식비`와 `식비 `처럼 정리 후 같은 이름이 되는 분류가 있으면 마이그레이션이 안전하게 중단된다.
+이 경우 중복 분류를 먼저 정리한 뒤 다시 실행한다. 그 밖의 실행 중 오류는 전체 파일을 다시 실행하기 전에
 Database의 Functions에서 `set_category_order` 존재 여부를 먼저 확인한다.
 
 ## Auth 설정

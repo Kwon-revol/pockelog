@@ -1,4 +1,4 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -91,5 +91,27 @@ describe("SettingsScreen", () => {
     renderScreen({ setCategoryActiveAction: vi.fn(successChangeAction) });
     await user.click(screen.getByRole("button", { name: "교통 숨기기" }));
     expect(await screen.findByRole("status")).toHaveTextContent("변경했어요.");
+  });
+
+  it("shows a retry message when an immediate category action is rejected", async () => {
+    const user = userEvent.setup();
+    renderScreen({ setCategoryActiveAction: async () => { throw new Error("network down"); } });
+
+    await user.click(screen.getByRole("button", { name: "교통 숨기기" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("분류를 변경하지 못했습니다. 다시 시도해 주세요.");
+  });
+
+  it("disables immediate category controls while a request is pending", async () => {
+    const user = userEvent.setup();
+    let finish!: (state: SettingsActionState) => void;
+    const pending = new Promise<SettingsActionState>((resolve) => { finish = resolve; });
+    renderScreen({ setCategoryActiveAction: () => pending });
+
+    const hide = screen.getByRole("button", { name: "교통 숨기기" });
+    await user.click(hide);
+    await waitFor(() => expect(hide).toBeDisabled());
+    finish({ status: "success", message: "분류를 숨겼어요." });
+    expect(await screen.findByRole("status")).toHaveTextContent("분류를 숨겼어요.");
   });
 });

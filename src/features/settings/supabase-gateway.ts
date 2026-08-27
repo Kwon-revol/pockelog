@@ -1,5 +1,9 @@
 import "server-only";
 
+import {
+  mapCategoryUpdateResult,
+  resolveNextCategorySortOrder,
+} from "@/features/settings/gateway-utils";
 import type { SettingsGateway } from "@/features/settings/workflows";
 import { resolveTransactionContext } from "@/features/transactions/supabase-gateway";
 import { createServerClient } from "@/shared/supabase/server";
@@ -32,7 +36,7 @@ export async function createSupabaseSettingsGateway(): Promise<SettingsGateway> 
     },
 
     async createCategory(context, input) {
-      const { data: last } = await supabase
+      const { data: last, error: orderError } = await supabase
         .from("categories")
         .select("sort_order")
         .eq("ledger_id", context.ledgerId)
@@ -40,12 +44,14 @@ export async function createSupabaseSettingsGateway(): Promise<SettingsGateway> 
         .order("sort_order", { ascending: false })
         .limit(1)
         .maybeSingle();
+      const nextSortOrder = resolveNextCategorySortOrder(last, orderError);
+      if (nextSortOrder === null) return "error";
       const { error } = await supabase.from("categories").insert({
         ledger_id: context.ledgerId,
         type: input.type,
         name: input.name,
         color: input.color,
-        sort_order: (last?.sort_order ?? -1) + 1,
+        sort_order: nextSortOrder,
       });
       if (!error) return "created";
       if (error.code === "23505") return "duplicate";
@@ -61,9 +67,7 @@ export async function createSupabaseSettingsGateway(): Promise<SettingsGateway> 
         .eq("type", input.type)
         .select("id")
         .maybeSingle();
-      if (!error && data) return "updated";
-      if (error?.code === "23505") return "duplicate";
-      return error?.code === "42501" || !data ? "forbidden" : "error";
+      return mapCategoryUpdateResult(error?.code, Boolean(data));
     },
 
     async setCategoryActive(context, id, active) {
@@ -74,7 +78,8 @@ export async function createSupabaseSettingsGateway(): Promise<SettingsGateway> 
         .eq("ledger_id", context.ledgerId)
         .select("id")
         .maybeSingle();
-      return !error && data ? "updated" : error?.code === "500" ? "error" : "forbidden";
+      const result = mapCategoryUpdateResult(error?.code, Boolean(data));
+      return result === "duplicate" ? "error" : result;
     },
 
     async setCategoryOrder(context, type, orderedIds) {

@@ -1,3 +1,40 @@
+do $$
+begin
+  if exists (
+    select 1
+    from public.categories
+    group by ledger_id, type, lower(btrim(name))
+    having count(*) > 1
+  ) then
+    raise exception using
+      errcode = '23505',
+      message = 'category names conflict after trimming whitespace';
+  end if;
+end;
+$$;
+
+update public.categories
+set name = btrim(name)
+where name <> btrim(name);
+
+drop index if exists public.categories_ledger_type_name_unique;
+create unique index if not exists categories_ledger_type_trimmed_name_unique
+  on public.categories (ledger_id, type, lower(btrim(name)));
+
+do $$
+begin
+  if not exists (
+    select 1
+    from pg_constraint
+    where conrelid = 'public.categories'::regclass
+      and conname = 'categories_name_trimmed'
+  ) then
+    alter table public.categories
+      add constraint categories_name_trimmed check (name = btrim(name));
+  end if;
+end;
+$$;
+
 create or replace function public.set_category_order(
   target_ledger_id uuid,
   target_type public.transaction_type,
