@@ -74,5 +74,5 @@ select
 
 `tests/db/`의 pgTAP 테스트는 추후 Docker 또는 CI 기반 Supabase 테스트 환경을 추가할 때 실행한다.
 현재 방식에서는 전용 개발 Supabase에 세 마이그레이션을 적용한 뒤 파괴적 E2E 안전 표시를
-켠 경우에만 `tests/e2e/ledger.spec.ts`를 실행한다. 운영 프로젝트의
+켠 경우에만 `tests/e2e/ledger.spec.ts`와 `tests/e2e/statistics.spec.ts`를 실행한다. 운영 프로젝트의
 `private.project_settings.allow_destructive_e2e`는 항상 `false`로 유지한다.

@@ -12,13 +12,20 @@ import {
 const won = new Intl.NumberFormat("ko-KR");
 const ratio = new Intl.NumberFormat("ko-KR", { maximumFractionDigits: 1 });
 
-export function StatisticsDetailScreen({
-  initialData,
-  loadPage,
-}: {
+type StatisticsDetailScreenProps = {
   initialData: StatisticsDetailData;
   loadPage?: LoadTransactionPage;
-}) {
+};
+
+export function StatisticsDetailScreen(props: StatisticsDetailScreenProps) {
+  const resetKey = `${props.initialData.period.key}:${props.initialData.type}`;
+  return <StatisticsDetailContent {...props} key={resetKey} />;
+}
+
+function StatisticsDetailContent({
+  initialData,
+  loadPage,
+}: StatisticsDetailScreenProps) {
   const pages = useTransactionPages(initialData.page, initialData.filters, loadPage);
   const typeLabel = initialData.type === "expense" ? "지출" : "수입";
 

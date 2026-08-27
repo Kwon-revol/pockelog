@@ -11,6 +11,7 @@ import {
   StatisticsQueryError,
   type StatisticsGateway,
 } from "@/features/statistics/workflows";
+import { statisticsDetailPath } from "@/features/statistics/routing";
 import type { LedgerPeriod } from "@/features/transactions/period";
 
 const periods: LedgerPeriod[] = [
@@ -40,6 +41,11 @@ function gateway(overrides: Partial<StatisticsGateway> = {}): StatisticsGateway 
 }
 
 describe("statistics query mapping", () => {
+  it("preserves the selected type in a detail return path", () => {
+    expect(statisticsDetailPath("2026-08-10", "income")).toBe("/statistics/2026-08-10?type=income");
+    expect(statisticsDetailPath("2026-08-10", "expense")).toBe("/statistics/2026-08-10");
+  });
+
   it("maps database period rows onto requested periods and fills missing rows", () => {
     expect(toPeriodSummaries([
       { period_ordinal: 1, start_on: "2026-08-10", end_exclusive: "2026-09-10", income_total: "3000000", expense_total: "800000", balance: "2200000" },

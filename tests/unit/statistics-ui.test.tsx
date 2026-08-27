@@ -154,4 +154,32 @@ describe("StatisticsDetailScreen", () => {
     expect(loadPage).toHaveBeenCalledTimes(1);
     expect(screen.queryByText("모든 내역을 확인했어요")).not.toBeInTheDocument();
   });
+
+  it("replaces source transactions when the selected type changes", () => {
+    const { rerender } = render(<StatisticsDetailScreen initialData={detailFixture} />);
+    expect(screen.getAllByText("점심").length).toBeGreaterThan(0);
+
+    const incomeData: StatisticsDetailData = {
+      ...detailFixture,
+      type: "income",
+      typeTotal: 100000,
+      filters: { ...detailFixture.filters, type: "income" },
+      categories: [{ categoryId: "side", name: "부수입", color: "#10B981", amountTotal: 100000, ratio: 100, sortOrder: 2 }],
+      page: {
+        items: [{
+          ...detailFixture.page.items[0],
+          id: "55555555-5555-4555-8555-555555555555",
+          type: "income",
+          description: "프로젝트 수입",
+          amount: 100000,
+          category: { id: "side", name: "부수입", color: "#10B981", type: "income" },
+        }],
+        nextCursor: null,
+      },
+    };
+    rerender(<StatisticsDetailScreen initialData={incomeData} />);
+
+    expect(screen.queryByText("점심")).not.toBeInTheDocument();
+    expect(screen.getAllByText("프로젝트 수입").length).toBeGreaterThan(0);
+  });
 });

@@ -3,6 +3,7 @@ import { notFound, redirect } from "next/navigation";
 
 import { StatisticsDetailScreen } from "@/features/statistics/detail-screen";
 import { getStatisticsDetailData } from "@/features/statistics/queries";
+import { statisticsDetailPath } from "@/features/statistics/routing";
 import {
   StatisticsAuthenticationError,
   StatisticsPeriodError,
@@ -25,7 +26,7 @@ export default async function StatisticsDetailPage({
     data = await getStatisticsDetailData(periodKey, type);
   } catch (error) {
     if (error instanceof StatisticsAuthenticationError) {
-      redirect(`/login?next=${encodeURIComponent(`/statistics/${periodKey}`)}`);
+      redirect(`/login?next=${encodeURIComponent(statisticsDetailPath(periodKey, type))}`);
     }
     if (error instanceof StatisticsPeriodError) notFound();
     throw error;

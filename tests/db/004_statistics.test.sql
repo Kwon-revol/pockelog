@@ -28,6 +28,12 @@ values
     now(), now()
   );
 
+select set_config(
+  'tests.user_a_ledger',
+  (select id::text from public.ledgers where owner_id = '40000000-0000-0000-0000-000000000001'),
+  true
+);
+
 set local role authenticated;
 select set_config('request.jwt.claim.sub', '40000000-0000-0000-0000-000000000001', true);
 select set_config('request.jwt.claim.role', 'authenticated', true);
@@ -92,7 +98,7 @@ select is(
 
 select is(
   (select count(*) from public.get_period_statistics(
-    (select id from public.ledgers where owner_id = '40000000-0000-0000-0000-000000000001'),
+    current_setting('tests.user_a_ledger')::uuid,
     array['2026-08-01'::date, '2026-07-01'::date],
     array['2026-09-01'::date, '2026-08-01'::date]
   )),
@@ -113,7 +119,7 @@ select set_config('request.jwt.claim.sub', '40000000-0000-0000-0000-000000000002
 
 select is(
   (select count(*) from public.get_period_statistics(
-    (select id from public.ledgers where owner_id = '40000000-0000-0000-0000-000000000001'),
+    current_setting('tests.user_a_ledger')::uuid,
     array['2026-08-01'::date], array['2026-09-01'::date]
   )),
   0::bigint,
@@ -122,7 +128,7 @@ select is(
 
 select is(
   (select count(*) from public.get_category_statistics(
-    (select id from public.ledgers where owner_id = '40000000-0000-0000-0000-000000000001'),
+    current_setting('tests.user_a_ledger')::uuid,
     '2026-08-01', '2026-09-01', 'expense'
   )),
   0::bigint,
