@@ -77,7 +77,7 @@ export function LedgerScreen({ initialData, createAction, updateAction, trashAct
           <button className="mt-6 rounded-2xl border border-emerald-200 px-5 py-3 text-sm font-bold text-emerald-700" onClick={() => setSelected(null)} type="button">내역 추가</button>
         </section>
       ) : (
-        <TransactionList items={pages.items} hasNext={pages.hasNext} loading={pages.loading} error={pages.loadError} sentinelRef={pages.sentinelRef} onEdit={setSelected} onRetry={() => void pages.requestNextPage()} />
+        <TransactionList items={pages.items} hasNext={pages.hasNext} loading={pages.loading} error={pages.loadError} sentinelRef={pages.sentinelRef} onEdit={setSelected} onRetry={() => void pages.requestNextPage()} showCreator={initialData.ledger.kind === "shared"} />
       )}
 
       <button aria-label="내역 추가" className="fixed bottom-20 right-5 z-20 flex size-14 items-center justify-center rounded-full bg-emerald-600 text-3xl font-light text-white shadow-xl shadow-emerald-600/30 lg:hidden" onClick={() => setSelected(null)} type="button">+</button>

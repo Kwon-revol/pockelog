@@ -26,6 +26,7 @@ type TransactionListProps = {
   error: string | null;
   sentinelRef: RefObject<HTMLDivElement | null>;
   onEdit?: (item: TransactionListItem) => void;
+  showCreator?: boolean;
   onRetry: () => void;
 };
 
@@ -36,6 +37,7 @@ export function TransactionList({
   error,
   sentinelRef,
   onEdit,
+  showCreator = false,
   onRetry,
 }: TransactionListProps) {
   if (items.length === 0) return null;
@@ -59,7 +61,7 @@ export function TransactionList({
                   <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: item.category.color }} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-bold text-slate-900">{item.description}</span>
-                    <span className="mt-0.5 block text-xs text-slate-500">{item.category.name} · {item.createdBy.name} 작성</span>
+                    <span className="mt-0.5 block text-xs text-slate-500">{item.category.name}{showCreator ? ` · ${item.createdBy.name} 작성` : ""}</span>
                   </span>
                   <span className={`font-black ${item.type === "expense" ? "text-rose-600" : "text-emerald-700"}`}>
                     {amountText(item)}
@@ -84,7 +86,7 @@ export function TransactionList({
               <th className="px-5 py-4">내용</th>
               <th className="px-5 py-4">분류</th>
               <th className="px-5 py-4">유형</th>
-              <th className="px-5 py-4">작성자</th>
+              {showCreator ? <th className="px-5 py-4">작성자</th> : null}
               <th className="px-5 py-4 text-right">금액</th>
             </tr>
           </thead>
@@ -101,7 +103,7 @@ export function TransactionList({
                   <span className="inline-flex items-center gap-2"><span className="size-2 rounded-full" style={{ backgroundColor: item.category.color }} />{item.category.name}</span>
                 </td>
                 <td className="px-5 py-4 text-slate-500">{item.type === "expense" ? "지출" : "수입"}</td>
-                <td className="px-5 py-4 text-slate-500">{item.createdBy.name} 작성</td>
+                {showCreator ? <td className="px-5 py-4 text-slate-500">{item.createdBy.name} 작성</td> : null}
                 <td className={`px-5 py-4 text-right font-black ${item.type === "expense" ? "text-rose-600" : "text-emerald-700"}`}>{amountText(item)}</td>
               </tr>
             ))}

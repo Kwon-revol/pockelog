@@ -14,7 +14,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 const fixture: LedgerPageData = {
-  ledger: { id: "ledger-1", name: "내 장부", periodStartDay: 1 },
+  ledger: { id: "ledger-1", name: "내 장부", periodStartDay: 1, kind: "personal" },
   categories: [
     { id: "11111111-1111-4111-8111-111111111111", name: "식비", color: "#F97316", type: "expense" },
     { id: "22222222-2222-4222-8222-222222222222", name: "급여", color: "#10B981", type: "income" },
@@ -87,6 +87,7 @@ describe("LedgerScreen", () => {
 
     expect(screen.getByTestId("expense-total")).toHaveTextContent("46,500원");
     expect(screen.getByTestId("balance-total")).toHaveTextContent("2,753,500원");
+    expect(screen.queryByText("권혁 작성")).not.toBeInTheDocument();
     await user.click(screen.getAllByRole("button", { name: "내역 추가" })[0]);
     expect(screen.getByRole("dialog", { name: "내역 추가" })).toBeVisible();
   });
@@ -219,7 +220,7 @@ describe("LedgerScreen", () => {
     };
     render(
       <LedgerScreen
-        initialData={{ ...fixture, page: { items: [otherMemberItem], nextCursor: null } }}
+        initialData={{ ...fixture, ledger: { ...fixture.ledger, kind: "shared" }, page: { items: [otherMemberItem], nextCursor: null } }}
         createAction={successAction}
         updateAction={successAction}
         trashAction={successAction}

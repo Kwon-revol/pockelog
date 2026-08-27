@@ -96,11 +96,11 @@ async function getLedger(
 ) {
   const { data, error } = await supabase
     .from("ledgers")
-    .select("id,name,period_start_day,owner_id")
+    .select("id,name,period_start_day,owner_id,kind")
     .eq("id", ledgerId)
     .maybeSingle();
   if (error || !data) throw new TransactionQueryError("기본 장부를 불러오지 못했습니다.");
-  return { id: data.id, name: data.name, periodStartDay: data.period_start_day, ownerId: data.owner_id };
+  return { id: data.id, name: data.name, periodStartDay: data.period_start_day, ownerId: data.owner_id, kind: data.kind };
 }
 
 async function getCategories(
@@ -137,7 +137,7 @@ export async function getLedgerPageData(
     getSummary(supabase, ledger.id, filters),
   ]);
   return {
-    ledger: { id: ledger.id, name: ledger.name, periodStartDay: ledger.periodStartDay },
+    ledger: { id: ledger.id, name: ledger.name, periodStartDay: ledger.periodStartDay, kind: ledger.kind },
     categories,
     filters,
     page,
