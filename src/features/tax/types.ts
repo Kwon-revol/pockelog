@@ -30,3 +30,36 @@ export type PensionTaxResult = {
   estimatedTotalBenefit: number;
   ruleVersion: string;
 };
+
+export type TaxCursor = {
+  occurredOn: string;
+  createdAt: string;
+  id: string;
+};
+
+export type TaxContribution = {
+  id: string;
+  ledgerId: string;
+  ledgerName: string;
+  canManage: boolean;
+  occurredOn: string;
+  description: string;
+  amount: number;
+  createdAt: string;
+  categoryName: string;
+  systemCode: TaxCategoryCode;
+};
+
+export type TaxContributionPage = {
+  items: TaxContribution[];
+  nextCursor: string | null;
+};
+
+export type TaxPageData = {
+  taxYear: 2026;
+  supportedYears: readonly [2026];
+  grossSalary: number | null;
+  rule: TaxRule;
+  result: PensionTaxResult | null;
+  contributions: TaxContributionPage;
+};
