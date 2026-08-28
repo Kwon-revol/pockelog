@@ -14,7 +14,7 @@ vi.mock("next/navigation", () => ({
 }));
 
 const fixture: LedgerPageData = {
-  ledger: { id: "ledger-1", name: "내 장부", periodStartDay: 1 },
+  ledger: { id: "ledger-1", name: "내 장부", periodStartDay: 1, kind: "personal" },
   categories: [
     { id: "11111111-1111-4111-8111-111111111111", name: "식비", color: "#F97316", type: "expense" },
     { id: "22222222-2222-4222-8222-222222222222", name: "급여", color: "#10B981", type: "income" },
@@ -36,6 +36,8 @@ const fixture: LedgerPageData = {
       description: "점심",
       amount: 46500,
       memo: "",
+      createdBy: { id: "user-1", name: "권혁" },
+      canManage: true,
       category: { id: "11111111-1111-4111-8111-111111111111", name: "식비", color: "#F97316", type: "expense" },
       createdAt: "2026-08-26T01:00:00.000Z",
     }],
@@ -85,6 +87,8 @@ describe("LedgerScreen", () => {
 
     expect(screen.getByTestId("expense-total")).toHaveTextContent("46,500원");
     expect(screen.getByTestId("balance-total")).toHaveTextContent("2,753,500원");
+    expect(screen.queryByText("권혁 작성")).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /점심/ })).toHaveLength(2);
     await user.click(screen.getAllByRole("button", { name: "내역 추가" })[0]);
     expect(screen.getByRole("dialog", { name: "내역 추가" })).toBeVisible();
   });
@@ -143,7 +147,7 @@ describe("LedgerScreen", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /점심/ }));
+    await user.click(screen.getAllByRole("button", { name: /점심/ })[0]);
     const dialog = screen.getByRole("dialog", { name: "내역 수정" });
     expect(within(dialog).getByRole("option", { name: "예전 식비" })).toBeInTheDocument();
     expect(within(dialog).getByLabelText("분류")).toHaveValue(inactiveCategory.id);
@@ -183,7 +187,7 @@ describe("LedgerScreen", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /점심/ }));
+    await user.click(screen.getAllByRole("button", { name: /점심/ })[0]);
     const dialog = screen.getByRole("dialog", { name: "내역 수정" });
     await user.click(within(dialog).getByRole("button", { name: "삭제" }));
     expect(await within(dialog).findByRole("alert")).toHaveTextContent("이 내역을 변경할 수 없습니다.");
@@ -201,10 +205,32 @@ describe("LedgerScreen", () => {
       />,
     );
 
-    await user.click(screen.getByRole("button", { name: /점심/ }));
+    await user.click(screen.getAllByRole("button", { name: /점심/ })[0]);
     const dialog = screen.getByRole("dialog", { name: "내역 수정" });
     await user.click(within(dialog).getByRole("button", { name: "삭제" }));
     expect(await within(dialog).findByRole("alert")).toHaveTextContent("휴지통으로 이동하지 못했습니다. 다시 시도해 주세요.");
     expect(dialog).toBeVisible();
+  });
+
+  it("shows the creator and does not open another member's transaction", async () => {
+    const user = userEvent.setup();
+    const otherMemberItem = {
+      ...fixture.page.items[0],
+      createdBy: { id: "user-2", name: "민지" },
+      canManage: false,
+    };
+    render(
+      <LedgerScreen
+        initialData={{ ...fixture, ledger: { ...fixture.ledger, kind: "shared" }, page: { items: [otherMemberItem], nextCursor: null } }}
+        createAction={successAction}
+        updateAction={successAction}
+        trashAction={successAction}
+      />,
+    );
+
+    expect(screen.getAllByText("민지 작성").length).toBeGreaterThan(0);
+    expect(screen.queryByRole("button", { name: /점심/ })).not.toBeInTheDocument();
+    await user.click(screen.getAllByText("점심")[0]);
+    expect(screen.queryByRole("dialog", { name: "내역 수정" })).not.toBeInTheDocument();
   });
 });
