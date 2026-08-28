@@ -69,6 +69,8 @@ const detailFixture: StatisticsDetailData = {
       description: "점심",
       amount: 30000,
       memo: "",
+      createdBy: { id: "user-1", name: "권혁" },
+      canManage: true,
       category: { id: "food", name: "식비", color: "#F97316", type: "expense" },
       createdAt: "2026-08-26T01:00:00.000Z",
     }],

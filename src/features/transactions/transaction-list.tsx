@@ -26,6 +26,7 @@ type TransactionListProps = {
   error: string | null;
   sentinelRef: RefObject<HTMLDivElement | null>;
   onEdit?: (item: TransactionListItem) => void;
+  showCreator?: boolean;
   onRetry: () => void;
 };
 
@@ -36,6 +37,7 @@ export function TransactionList({
   error,
   sentinelRef,
   onEdit,
+  showCreator = false,
   onRetry,
 }: TransactionListProps) {
   if (items.length === 0) return null;
@@ -59,13 +61,13 @@ export function TransactionList({
                   <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: item.category.color }} />
                   <span className="min-w-0 flex-1">
                     <span className="block truncate font-bold text-slate-900">{item.description}</span>
-                    <span className="mt-0.5 block text-xs text-slate-500">{item.category.name}</span>
+                    <span className="mt-0.5 block text-xs text-slate-500">{item.category.name}{showCreator ? ` · ${item.createdBy.name} 작성` : ""}</span>
                   </span>
                   <span className={`font-black ${item.type === "expense" ? "text-rose-600" : "text-emerald-700"}`}>
                     {amountText(item)}
                   </span>
                 </>;
-                return onEdit ? (
+                return onEdit && item.canManage ? (
                   <button className="flex w-full items-center gap-3 border-b border-slate-100 px-4 py-4 text-left last:border-0" key={item.id} onClick={() => onEdit(item)} type="button">{content}</button>
                 ) : (
                   <div className="flex w-full items-center gap-3 border-b border-slate-100 px-4 py-4 text-left last:border-0" key={item.id}>{content}</div>
@@ -84,22 +86,29 @@ export function TransactionList({
               <th className="px-5 py-4">내용</th>
               <th className="px-5 py-4">분류</th>
               <th className="px-5 py-4">유형</th>
+              {showCreator ? <th className="px-5 py-4">작성자</th> : null}
               <th className="px-5 py-4 text-right">금액</th>
             </tr>
           </thead>
           <tbody>
             {items.map((item) => (
               <tr
-                className={`border-t border-slate-100 ${onEdit ? "cursor-pointer transition hover:bg-emerald-50/40" : ""}`}
+                className="border-t border-slate-100"
                 key={item.id}
-                onClick={onEdit ? () => onEdit(item) : undefined}
               >
                 <td className="px-5 py-4 text-slate-500">{item.occurredOn}</td>
-                <td className="px-5 py-4 font-bold text-slate-900">{item.description}</td>
+                <td className="px-5 py-4 font-bold text-slate-900">
+                  {onEdit && item.canManage ? (
+                    <button className="rounded-lg text-left font-bold outline-none hover:text-emerald-700 focus-visible:ring-2 focus-visible:ring-emerald-500" onClick={() => onEdit(item)} type="button">
+                      {item.description}
+                    </button>
+                  ) : item.description}
+                </td>
                 <td className="px-5 py-4">
                   <span className="inline-flex items-center gap-2"><span className="size-2 rounded-full" style={{ backgroundColor: item.category.color }} />{item.category.name}</span>
                 </td>
                 <td className="px-5 py-4 text-slate-500">{item.type === "expense" ? "지출" : "수입"}</td>
+                {showCreator ? <td className="px-5 py-4 text-slate-500">{item.createdBy.name} 작성</td> : null}
                 <td className={`px-5 py-4 text-right font-black ${item.type === "expense" ? "text-rose-600" : "text-emerald-700"}`}>{amountText(item)}</td>
               </tr>
             ))}

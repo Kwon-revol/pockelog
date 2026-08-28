@@ -42,6 +42,8 @@ export type TransactionListItem = {
   amount: number;
   memo: string;
   category: CategoryOption;
+  createdBy: { id: string; name: string };
+  canManage: boolean;
   createdAt: string;
 };
 
@@ -57,7 +59,7 @@ export type TransactionSummary = {
 };
 
 export type LedgerPageData = {
-  ledger: { id: string; name: string; periodStartDay: number | null };
+  ledger: { id: string; name: string; periodStartDay: number | null; kind: "personal" | "shared" };
   categories: CategoryOption[];
   filters: TransactionFilters;
   page: TransactionPage;

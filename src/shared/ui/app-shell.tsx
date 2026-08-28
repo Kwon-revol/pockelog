@@ -1,8 +1,14 @@
 import Link from "next/link";
 
+import type { AppLedger } from "@/features/ledgers/types";
+import { LedgerSwitcher, type SwitchLedgerAction } from "@/shared/ui/ledger-switcher";
+
 type AppShellProps = {
   children: React.ReactNode;
-  ledgerName: string;
+  currentLedger: AppLedger;
+  ledgers: AppLedger[];
+  pendingInvitationCount: number;
+  switchLedgerAction: SwitchLedgerAction;
   userName: string;
 };
 
@@ -47,15 +53,15 @@ function Navigation({ mobile = false }: { mobile?: boolean }) {
   );
 }
 
-export function AppShell({ children, ledgerName, userName }: AppShellProps) {
+export function AppShell({ children, currentLedger, ledgers, pendingInvitationCount, switchLedgerAction, userName }: AppShellProps) {
   return (
     <div className="min-h-screen bg-[#f5f8f6]">
       <aside className="fixed inset-y-0 left-0 hidden w-64 border-r border-slate-200/80 bg-white px-5 py-7 lg:flex lg:flex-col">
         <Link className="px-3 text-2xl font-black tracking-[-0.05em] text-slate-950" href="/ledger">PockeLog</Link>
-        <div className="mt-8 rounded-2xl border border-emerald-100 bg-emerald-50/70 px-4 py-3">
-          <p className="text-xs font-semibold text-emerald-700">현재 장부</p>
-          <p className="mt-1 truncate font-bold text-slate-900">{ledgerName}</p>
+        <div className="mt-8 rounded-2xl border border-emerald-100 bg-emerald-50/70 px-3 py-3">
+          <LedgerSwitcher action={switchLedgerAction} currentLedger={currentLedger} ledgers={ledgers} />
         </div>
+        {pendingInvitationCount ? <Link className="mt-3 rounded-xl bg-amber-50 px-3 py-2 text-xs font-bold text-amber-800" href="/settings">받은 초대 {pendingInvitationCount}개</Link> : null}
         <div className="mt-6 flex-1"><Navigation /></div>
         <Link className="rounded-2xl border border-slate-200 px-4 py-3 text-sm font-semibold text-slate-600 hover:bg-slate-50" href="/settings">
           {userName}님
@@ -65,16 +71,25 @@ export function AppShell({ children, ledgerName, userName }: AppShellProps) {
       <div className="lg:pl-64">
         <header className="sticky top-0 z-20 border-b border-slate-200/80 bg-white/90 px-5 py-4 backdrop-blur md:px-8">
           <div className="mx-auto flex max-w-6xl items-center justify-between">
-            <div className="lg:hidden">
+            <div className="min-w-0 flex-1 lg:hidden">
               <p className="text-lg font-black tracking-[-0.04em]">PockeLog</p>
-              <p className="max-w-48 truncate text-xs font-medium text-slate-500">{ledgerName}</p>
+              <LedgerSwitcher action={switchLedgerAction} compact currentLedger={currentLedger} ledgers={ledgers} />
             </div>
             <div className="hidden lg:block">
               <p className="text-xs font-semibold text-slate-400">나의 재정 공간</p>
-              <p className="font-bold text-slate-800">{ledgerName}</p>
+              <p className="font-bold text-slate-800">{currentLedger.name}</p>
             </div>
-            <Link aria-label="설정 열기" className="flex size-10 items-center justify-center rounded-full bg-emerald-100 text-sm font-black text-emerald-800" href="/settings">
+            <Link
+              aria-label={pendingInvitationCount > 0 ? `설정 열기, 받은 초대 ${pendingInvitationCount}개` : "설정 열기"}
+              className="relative flex size-10 items-center justify-center rounded-full bg-emerald-100 text-sm font-black text-emerald-800"
+              href="/settings"
+            >
               {userName.slice(0, 1)}
+              {pendingInvitationCount > 0 ? (
+                <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-emerald-600 px-1 text-[10px] font-bold text-white">
+                  {pendingInvitationCount}
+                </span>
+              ) : null}
             </Link>
           </div>
         </header>
