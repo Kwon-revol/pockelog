@@ -19,6 +19,10 @@ export type TransactionRow = {
   category: CategoryOption | CategoryOption[];
 };
 
+export function getCreatorProfileSource(kind: "personal" | "shared") {
+  return kind === "shared" ? "rpc" : "profiles";
+}
+
 type TransactionViewer = {
   currentUserId: string;
   ownerId: string;

@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   buildCursorFilter,
+  getCreatorProfileSource,
   sanitizeSearchTerm,
   toTransactionPage,
 } from "@/features/transactions/query-utils";
@@ -13,6 +14,11 @@ const cursor = {
 };
 
 describe("transaction query boundaries", () => {
+  it("uses the new creator RPC only for shared ledgers", () => {
+    expect(getCreatorProfileSource("personal")).toBe("profiles");
+    expect(getCreatorProfileSource("shared")).toBe("rpc");
+  });
+
   it("continues newest sorting strictly after the complete cursor key", () => {
     expect(buildCursorFilter(cursor, "newest")).toBe(
       "occurred_on.lt.2026-08-26,and(occurred_on.eq.2026-08-26,created_at.lt.2026-08-26T01:02:03.000Z),and(occurred_on.eq.2026-08-26,created_at.eq.2026-08-26T01:02:03.000Z,id.lt.11111111-1111-4111-8111-111111111111)",
