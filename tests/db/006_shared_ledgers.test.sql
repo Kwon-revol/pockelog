@@ -75,8 +75,8 @@ select is(
 );
 select is(
   (select count(*)::integer from public.categories where ledger_id = current_setting('tests.shared_ledger')::uuid),
-  15,
-  '공동 장부에는 기본 분류 15개가 생성된다'
+  17,
+  '공동 장부에는 연금저축·IRP를 포함한 기본 분류 17개가 생성된다'
 );
 select is(
   (select default_ledger_id from public.user_private_profiles where user_id = auth.uid()),
