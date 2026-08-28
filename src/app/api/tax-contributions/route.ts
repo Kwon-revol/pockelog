@@ -9,7 +9,9 @@ import {
 
 export async function GET(request: NextRequest) {
   const year = request.nextUrl.searchParams.get("year");
-  const cursor = decodeTaxCursor(request.nextUrl.searchParams.get("cursor"));
+  const cursor = year === "2026"
+    ? decodeTaxCursor(request.nextUrl.searchParams.get("cursor"), 2026)
+    : null;
   if (year !== "2026" || !cursor) {
     return Response.json({ message: "잘못된 조회 요청입니다." }, { status: 400 });
   }

@@ -25,13 +25,18 @@ const cursor = {
   id: "11111111-1111-4111-8111-111111111111",
 };
 
+function encodeRawCursor(value: unknown) {
+  return Buffer.from(JSON.stringify(value), "utf8").toString("base64url");
+}
+
 function request(query: string) {
   return { nextUrl: new URL(`http://localhost/api/tax-contributions?${query}`) } as Parameters<typeof GET>[0];
 }
 
 describe("tax contribution page route", () => {
   beforeEach(() => {
-    vi.clearAllMocks();
+    vi.resetAllMocks();
+    mocks.getTaxContributionPage.mockResolvedValue({ items: [], nextCursor: null });
   });
 
   it.each([
@@ -40,6 +45,9 @@ describe("tax contribution page route", () => {
     `year=02026&cursor=${encodeTaxCursor(cursor)}`,
     "year=2026&cursor=broken",
     "year=2026",
+    `year=2026&cursor=${encodeTaxCursor({ ...cursor, occurredOn: "2025-12-31" })}`,
+    `year=2026&cursor=${encodeTaxCursor({ ...cursor, occurredOn: "2027-01-01" })}`,
+    `year=2026&cursor=${encodeRawCursor({ ...cursor, userId: "user-2" })}`,
   ])("rejects unsupported years and malformed or missing cursors: %s", async (query) => {
     const response = await GET(request(query));
 

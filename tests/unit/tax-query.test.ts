@@ -42,6 +42,10 @@ const taxCursor = {
   id: "11111111-1111-4111-8111-111111111111",
 };
 
+function encodeRawCursor(value: unknown) {
+  return Buffer.from(JSON.stringify(value), "utf8").toString("base64url");
+}
+
 function contributionRows(count: number): TaxContributionRow[] {
   return Array.from({ length: count }, (_, index) => ({
     id: `${String(index + 1).padStart(8, "0")}-0000-4000-8000-000000000000`,
@@ -102,7 +106,7 @@ function serverClient(options: {
 
 describe("tax contribution cursor and row mapping", () => {
   it("round-trips the complete descending tuple cursor", () => {
-    expect(decodeTaxCursor(encodeTaxCursor(taxCursor))).toEqual(taxCursor);
+    expect(decodeTaxCursor(encodeTaxCursor(taxCursor), 2026)).toEqual(taxCursor);
   });
 
   it.each([
@@ -112,7 +116,18 @@ describe("tax contribution cursor and row mapping", () => {
     Buffer.from(JSON.stringify({ ...taxCursor, createdAt: "yesterday" })).toString("base64url"),
     Buffer.from(JSON.stringify({ ...taxCursor, id: "not-a-uuid" })).toString("base64url"),
   ])("rejects malformed Base64, dates, and UUIDs: %s", (value) => {
-    expect(decodeTaxCursor(value)).toBeNull();
+    expect(decodeTaxCursor(value, 2026)).toBeNull();
+  });
+
+  it.each(["2025-12-31", "2027-01-01"])(
+    "rejects a valid cursor date outside the expected tax year: %s",
+    (occurredOn) => {
+      expect(decodeTaxCursor(encodeTaxCursor({ ...taxCursor, occurredOn }), 2026)).toBeNull();
+    },
+  );
+
+  it("rejects an encoded cursor with additional fields", () => {
+    expect(decodeTaxCursor(encodeRawCursor({ ...taxCursor, userId: "user-2" }), 2026)).toBeNull();
   });
 
   it("maps RPC rows and uses the fiftieth visible row as the next tuple cursor", () => {
@@ -132,7 +147,7 @@ describe("tax contribution cursor and row mapping", () => {
       systemCode: "pension_savings",
     });
     expect(page.items.at(-1)?.description).toBe("납입 50");
-    expect(decodeTaxCursor(page.nextCursor)).toEqual({
+    expect(decodeTaxCursor(page.nextCursor, 2026)).toEqual({
       occurredOn: "2026-08-26",
       createdAt: "2026-08-26T01:02:03.049Z",
       id: "00000050-0000-4000-8000-000000000000",
