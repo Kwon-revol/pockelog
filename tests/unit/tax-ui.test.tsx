@@ -11,6 +11,7 @@ const pageMocks = vi.hoisted(() => {
   class TaxQueryError extends Error {}
   return {
     getTaxPageData: vi.fn(),
+    openTaxContributionAction: vi.fn(),
     redirect: vi.fn(),
     TaxAuthenticationError,
     TaxQueryError,
@@ -29,6 +30,7 @@ vi.mock("@/features/tax/queries", () => ({
 }));
 
 vi.mock("@/features/tax/actions", () => ({
+  openTaxContributionAction: pageMocks.openTaxContributionAction,
   saveTaxProfileAction: saveProfileAction,
 }));
 
@@ -271,6 +273,7 @@ describe("TaxScreen", () => {
 describe("TaxGoalsPage", () => {
   beforeEach(() => {
     pageMocks.getTaxPageData.mockReset();
+    pageMocks.openTaxContributionAction.mockReset();
     pageMocks.redirect.mockReset();
   });
 
@@ -292,5 +295,17 @@ describe("TaxGoalsPage", () => {
 
     expect(screen.getByRole("heading", { name: "세금 정보를 불러오지 못했어요" })).toBeVisible();
     expect(screen.getByText(/페이지를 새로고침해 다시 시도/)).toBeVisible();
+  });
+
+  it("renders a working edit button from the successful server page with a transaction-only contract", async () => {
+    const user = userEvent.setup();
+    pageMocks.getTaxPageData.mockResolvedValue(data);
+    pageMocks.openTaxContributionAction.mockResolvedValue({ status: "success" });
+    const { default: TaxGoalsPage } = await import("@/app/(app)/tax-goals/page");
+
+    render(await TaxGoalsPage());
+    await user.click(screen.getByRole("button", { name: "8월 연금저축 편집" }));
+
+    expect(pageMocks.openTaxContributionAction).toHaveBeenCalledWith(contribution.id);
   });
 });

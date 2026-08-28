@@ -44,6 +44,7 @@ const fixture: LedgerPageData = {
     nextCursor: null,
   },
   summary: { incomeTotal: 2800000, expenseTotal: 46500, balance: 2753500 },
+  initialEditorItem: null,
 };
 
 const successAction = async (): Promise<TransactionActionState> => ({ status: "success" });
@@ -151,6 +152,28 @@ describe("LedgerScreen", () => {
     const dialog = screen.getByRole("dialog", { name: "내역 수정" });
     expect(within(dialog).getByRole("option", { name: "예전 식비" })).toBeInTheDocument();
     expect(within(dialog).getByLabelText("분류")).toHaveValue(inactiveCategory.id);
+  });
+
+  it("opens the existing editor with the item loaded from an edit query", () => {
+    const initialEditorItem = {
+      ...fixture.page.items[0],
+      description: "세금 화면 연금저축",
+      amount: 500000,
+      memo: "자동 편집 연결",
+    };
+    render(
+      <LedgerScreen
+        initialData={{ ...fixture, initialEditorItem }}
+        createAction={successAction}
+        updateAction={successAction}
+        trashAction={successAction}
+      />,
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "내역 수정" });
+    expect(within(dialog).getByLabelText("내용")).toHaveValue("세금 화면 연금저축");
+    expect(within(dialog).getByRole("textbox", { name: /금액/ })).toHaveValue("500000");
+    expect(within(dialog).getByLabelText(/메모/)).toHaveValue("자동 편집 연결");
   });
 
   it("does not start the same cursor request twice before state rerenders", async () => {

@@ -1,7 +1,10 @@
 import type { Metadata } from "next";
 import { redirect } from "next/navigation";
 
-import { saveTaxProfileAction } from "@/features/tax/actions";
+import {
+  openTaxContributionAction,
+  saveTaxProfileAction,
+} from "@/features/tax/actions";
 import {
   getTaxPageData,
   TaxAuthenticationError,
@@ -31,5 +34,5 @@ export default async function TaxGoalsPage() {
   if (authenticationFailed) redirect("/login?next=%2Ftax-goals");
   if (!data) throw new TaxQueryError();
 
-  return <TaxScreen initialData={data} saveProfileAction={saveTaxProfileAction} />;
+  return <TaxScreen editAction={openTaxContributionAction} initialData={data} saveProfileAction={saveTaxProfileAction} />;
 }

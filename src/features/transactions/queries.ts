@@ -9,7 +9,10 @@ import {
   toTransactionPage,
   type TransactionRow,
 } from "@/features/transactions/query-utils";
-import { normalizeTransactionFilters } from "@/features/transactions/schemas";
+import {
+  normalizeTransactionFilters,
+  transactionIdSchema,
+} from "@/features/transactions/schemas";
 import { resolveTransactionContext } from "@/features/transactions/supabase-gateway";
 import type {
   CategoryOption,
@@ -17,6 +20,7 @@ import type {
   TransactionCursor,
   TransactionFilters,
   TransactionPage,
+  TransactionListItem,
   TransactionSummary,
 } from "@/features/transactions/types";
 import { createServerClient } from "@/shared/supabase/server";
@@ -123,6 +127,37 @@ async function getCategories(
   return (data ?? []) as CategoryOption[];
 }
 
+function singleSearchParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+async function getInitialEditorItem(
+  supabase: ServerClient,
+  rawTransactionId: string | string[] | undefined,
+  ledgerId: string,
+  currentUserId: string,
+  ownerId: string,
+): Promise<TransactionListItem | null> {
+  const parsedId = transactionIdSchema.safeParse(singleSearchParam(rawTransactionId));
+  if (!parsedId.success) return null;
+
+  const { data, error } = await supabase
+    .from("transactions")
+    .select("id,type,occurred_on,description,amount,memo,created_by,created_at,category:categories!transactions_category_id_fkey(id,name,color,type)")
+    .eq("id", parsedId.data)
+    .eq("ledger_id", ledgerId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (error || !data) return null;
+
+  const item = toTransactionPage([data as unknown as TransactionRow], {
+    currentUserId,
+    ownerId,
+    creatorNames: new Map(),
+  }).items[0];
+  return item?.canManage ? item : null;
+}
+
 export async function getLedgerPageData(
   searchParams: SearchParams,
   now = new Date(),
@@ -136,10 +171,11 @@ export async function getLedgerPageData(
     searchParams,
     getLedgerPeriod(now, ledger.periodStartDay),
   );
-  const [categories, page, summary] = await Promise.all([
+  const [categories, page, summary, initialEditorItem] = await Promise.all([
     getCategories(supabase, ledger.id),
     listTransactions(supabase, ledger.id, filters, null, context.userId, ledger.ownerId, ledger.kind),
     getSummary(supabase, ledger.id, filters),
+    getInitialEditorItem(supabase, searchParams.edit, ledger.id, context.userId, ledger.ownerId),
   ]);
   return {
     ledger: { id: ledger.id, name: ledger.name, periodStartDay: ledger.periodStartDay, kind: ledger.kind },
@@ -147,6 +183,7 @@ export async function getLedgerPageData(
     filters,
     page,
     summary,
+    initialEditorItem,
   };
 }
 

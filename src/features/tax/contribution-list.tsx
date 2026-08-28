@@ -8,7 +8,6 @@ import type { TaxActionState } from "@/features/tax/workflows";
 const won = new Intl.NumberFormat("ko-KR");
 
 export type TaxContributionEditAction = (
-  ledgerId: string,
   transactionId: string,
 ) => Promise<TaxActionState>;
 
@@ -67,7 +66,7 @@ export function ContributionList({
                 <p className="text-sm text-slate-600"><span className="mr-2 font-bold text-slate-400 lg:hidden">분류</span>{item.categoryName}</p>
                 <div className="min-w-0">
                   {item.canManage && editAction ? (
-                    <button className="max-w-full truncate rounded-lg text-left text-sm font-black text-slate-900 outline-none hover:text-emerald-700 focus-visible:ring-2 focus-visible:ring-emerald-500" onClick={() => void editAction(item.ledgerId, item.id)} type="button">
+                    <button className="max-w-full truncate rounded-lg text-left text-sm font-black text-slate-900 outline-none hover:text-emerald-700 focus-visible:ring-2 focus-visible:ring-emerald-500" onClick={() => void editAction(item.id)} type="button">
                       <span className="sr-only">{item.description} 편집</span><span aria-hidden="true">{item.description}</span>
                     </button>
                   ) : <p className="truncate text-sm font-black text-slate-900">{item.description}</p>}

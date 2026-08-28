@@ -1,13 +1,16 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
+import { transactionIdSchema } from "@/features/transactions/schemas";
 import { taxProfileFormSchema } from "@/features/tax/schemas";
 import { createSupabaseTaxGateway } from "@/features/tax/supabase-gateway";
 import {
   saveTaxProfile,
   type TaxActionState,
 } from "@/features/tax/workflows";
+import { createServerClient } from "@/shared/supabase/server";
 
 function formValue(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -41,4 +44,55 @@ export async function saveTaxProfileAction(
   });
   if (result.status === "success") revalidatePath("/tax-goals");
   return result;
+}
+
+export async function openTaxContributionAction(
+  transactionId: string,
+): Promise<TaxActionState> {
+  if (!transactionIdSchema.safeParse(transactionId).success) {
+    return { status: "error", message: "이 납입 내역을 편집할 수 없습니다." };
+  }
+
+  let destination: string | null = null;
+  try {
+    const supabase = await createServerClient();
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return { status: "error", message: "로그인이 필요합니다." };
+
+    const { data: transaction, error: transactionError } = await supabase
+      .from("transactions")
+      .select("id,ledger_id,created_by")
+      .eq("id", transactionId)
+      .eq("created_by", user.id)
+      .is("deleted_at", null)
+      .maybeSingle();
+    if (transactionError || !transaction) {
+      return { status: "error", message: "이 납입 내역을 편집할 수 없습니다." };
+    }
+
+    const { data: membership, error: membershipError } = await supabase
+      .from("ledger_members")
+      .select("ledger_id")
+      .eq("ledger_id", transaction.ledger_id)
+      .eq("user_id", user.id)
+      .maybeSingle();
+    if (membershipError || !membership) {
+      return { status: "error", message: "이 납입 내역을 편집할 수 없습니다." };
+    }
+
+    const { data: updatedProfile, error: updateError } = await supabase
+      .from("user_private_profiles")
+      .update({ default_ledger_id: transaction.ledger_id })
+      .eq("user_id", user.id)
+      .select("user_id")
+      .maybeSingle();
+    if (updateError || !updatedProfile) {
+      return { status: "error", message: "이 납입 내역을 편집할 수 없습니다." };
+    }
+    destination = `/ledger?edit=${transaction.id}`;
+  } catch {
+    return { status: "error", message: "이 납입 내역을 편집할 수 없습니다." };
+  }
+
+  redirect(destination);
 }

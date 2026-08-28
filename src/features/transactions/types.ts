@@ -64,6 +64,7 @@ export type LedgerPageData = {
   filters: TransactionFilters;
   page: TransactionPage;
   summary: TransactionSummary;
+  initialEditorItem: TransactionListItem | null;
 };
 
 export type TransactionActionState = {

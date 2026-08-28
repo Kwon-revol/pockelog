@@ -27,7 +27,7 @@ type LedgerScreenProps = {
 };
 
 export function LedgerScreen({ initialData, createAction, updateAction, trashAction, loadPage }: LedgerScreenProps) {
-  const [selected, setSelected] = useState<TransactionListItem | null | undefined>(undefined);
+  const [selected, setSelected] = useState<TransactionListItem | null | undefined>(initialData.initialEditorItem ?? undefined);
   const pages = useTransactionPages(initialData.page, initialData.filters, loadPage);
 
   const editAction: TransactionFormAction = selected
