@@ -59,6 +59,8 @@ export type TaxPageData = {
   taxYear: 2026;
   supportedYears: readonly [2026];
   grossSalary: number | null;
+  pensionPaid: number;
+  irpPaid: number;
   rule: TaxRule;
   result: PensionTaxResult | null;
   contributions: TaxContributionPage;

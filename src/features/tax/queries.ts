@@ -86,6 +86,8 @@ export async function getTaxPageData(year: number): Promise<TaxPageData> {
       taxYear: 2026,
       supportedYears: [2026],
       grossSalary,
+      pensionPaid,
+      irpPaid,
       rule,
       result: grossSalary === null
         ? null

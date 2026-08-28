@@ -203,6 +203,8 @@ describe("tax server queries", () => {
 
     await expect(getTaxPageData(2026)).resolves.toMatchObject({
       grossSalary: null,
+      pensionPaid: 6_000_000,
+      irpPaid: 3_000_000,
       result: null,
     });
   });
