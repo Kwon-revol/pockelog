@@ -2,7 +2,7 @@ begin;
 set local search_path = public, extensions;
 
 create extension if not exists pgtap with schema extensions;
-select plan(6);
+select plan(8);
 
 insert into auth.users (
   id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -64,8 +64,20 @@ select is_empty(
 
 select is(
   (select count(*) from public.categories),
-  15::bigint,
-  '사용자 B는 자신의 장부 분류만 조회한다'
+  17::bigint,
+  '사용자 B는 연금저축·IRP를 포함한 자신의 장부 분류만 조회한다'
+);
+
+select is(
+  (select count(*) from public.categories where system_code = 'pension_savings'),
+  1::bigint,
+  '사용자 B는 자신의 연금저축 시스템 분류 하나만 조회한다'
+);
+
+select is(
+  (select count(*) from public.categories where system_code = 'irp'),
+  1::bigint,
+  '사용자 B는 자신의 IRP 시스템 분류 하나만 조회한다'
 );
 
 reset role;

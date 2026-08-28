@@ -6,13 +6,13 @@ update public.categories
 set system_code = 'pension_savings'
 where type = 'expense'
   and lower(btrim(name)) = lower('연금저축')
-  and system_code is distinct from 'pension_savings';
+  and system_code is null;
 
 update public.categories
 set system_code = 'irp'
 where type = 'expense'
   and lower(btrim(name)) = lower('IRP')
-  and system_code is distinct from 'irp';
+  and system_code is null;
 
 create unique index if not exists categories_ledger_system_code_unique
   on public.categories (ledger_id, system_code)

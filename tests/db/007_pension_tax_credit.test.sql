@@ -2,7 +2,7 @@ begin;
 set local search_path = public, extensions;
 
 create extension if not exists pgtap with schema extensions;
-select plan(28);
+select plan(30);
 
 select has_column('public', 'categories', 'system_code', '분류에 시스템 식별자가 존재한다');
 select has_table('public', 'user_tax_profiles', '개인 과세연도 설정 테이블이 존재한다');
@@ -118,6 +118,39 @@ select is(
   ),
   (select count(*)::integer from public.ledgers),
   '모든 기존 장부에는 IRP 시스템 분류가 하나만 존재한다'
+);
+
+update public.categories
+set name = '장기 연금'
+where ledger_id = current_setting('tests.tax_a_personal')::uuid
+  and system_code = 'pension_savings';
+
+update public.categories
+set name = '연금저축'
+where ledger_id = current_setting('tests.tax_a_personal')::uuid
+  and system_code = 'irp';
+
+\ir ../../supabase/migrations/202608280006_pension_tax_credit.sql
+
+select is(
+  (
+    select system_code
+    from public.categories
+    where ledger_id = current_setting('tests.tax_a_personal')::uuid
+      and name = '장기 연금'
+  ),
+  'pension_savings'::text,
+  '마이그레이션 재실행은 표시 이름을 바꾼 연금저축 시스템 코드를 유지한다'
+);
+select is(
+  (
+    select system_code
+    from public.categories
+    where ledger_id = current_setting('tests.tax_a_personal')::uuid
+      and name = '연금저축'
+  ),
+  'irp'::text,
+  '마이그레이션 재실행은 다른 시스템 분류의 연금저축 표시 이름을 덮어쓰지 않는다'
 );
 select throws_ok(
   format(
