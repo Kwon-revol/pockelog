@@ -26,6 +26,10 @@ type LedgerScreenProps = {
   loadPage?: LoadTransactionPage;
 };
 
+export function getLedgerScreenKey(data: LedgerPageData) {
+  return JSON.stringify(data);
+}
+
 export function LedgerScreen({ initialData, createAction, updateAction, trashAction, loadPage }: LedgerScreenProps) {
   const [selected, setSelected] = useState<TransactionListItem | null | undefined>(
     initialData.initialEditorItem ?? (initialData.initialCategoryId ? null : undefined),

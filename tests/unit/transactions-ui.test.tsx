@@ -2,7 +2,10 @@ import { act, cleanup, render, screen, waitFor, within } from "@testing-library/
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import { LedgerScreen } from "@/features/transactions/ledger-screen";
+import {
+  getLedgerScreenKey,
+  LedgerScreen,
+} from "@/features/transactions/ledger-screen";
 import type {
   LedgerPageData,
   TransactionActionState,
@@ -331,6 +334,44 @@ describe("LedgerScreen", () => {
     await waitFor(() => expect(screen.queryByRole("button", { name: /급여/ })).not.toBeInTheDocument());
     expect(screen.getByTestId("income-total")).toHaveTextContent("0원");
     expect(screen.getByTestId("balance-total")).toHaveTextContent("0원");
+  });
+
+  it("replaces local pages and totals when refreshed server data changes", () => {
+    const commonProps = {
+      createAction: successAction,
+      updateAction: successAction,
+      trashAction: successAction,
+    };
+    const view = render(
+      <LedgerScreen
+        {...commonProps}
+        initialData={fixture}
+        key={getLedgerScreenKey(fixture)}
+      />,
+    );
+    const refreshedItem = {
+      ...fixture.page.items[0],
+      description: "수정된 점심",
+      amount: 50000,
+    };
+    const refreshedData: LedgerPageData = {
+      ...fixture,
+      page: { items: [refreshedItem], nextCursor: "next-page" },
+      summary: { incomeTotal: 2800000, expenseTotal: 50000, balance: 2750000 },
+    };
+
+    view.rerender(
+      <LedgerScreen
+        {...commonProps}
+        initialData={refreshedData}
+        key={getLedgerScreenKey(refreshedData)}
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: /^점심/ })).not.toBeInTheDocument();
+    expect(screen.getAllByRole("button", { name: /수정된 점심/ })).toHaveLength(2);
+    expect(screen.getByTestId("expense-total")).toHaveTextContent("50,000원");
+    expect(screen.getByTestId("balance-total")).toHaveTextContent("2,750,000원");
   });
 
   it("keeps the edit panel open when the trash request is rejected", async () => {

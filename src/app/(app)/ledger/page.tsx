@@ -6,7 +6,10 @@ import {
   trashTransactionAction,
   updateTransactionAction,
 } from "@/features/transactions/actions";
-import { LedgerScreen } from "@/features/transactions/ledger-screen";
+import {
+  getLedgerScreenKey,
+  LedgerScreen,
+} from "@/features/transactions/ledger-screen";
 import {
   getLedgerPageData,
   TransactionAuthenticationError,
@@ -31,7 +34,7 @@ export default async function LedgerPage({
     <LedgerScreen
       createAction={createTransactionAction}
       initialData={data}
-      key={JSON.stringify([data.filters, data.summary, data.page.items, data.initialEditorItem?.id, data.initialCategoryId])}
+      key={getLedgerScreenKey(data)}
       trashAction={trashTransactionAction}
       updateAction={updateTransactionAction}
     />
