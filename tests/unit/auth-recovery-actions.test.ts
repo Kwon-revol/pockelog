@@ -3,11 +3,23 @@ import { beforeEach, describe, expect, it, vi } from "vitest";
 const mocks = vi.hoisted(() => ({
   createServerClient: vi.fn(),
   redirect: vi.fn(),
+  cookieGet: vi.fn(),
+  cookieSet: vi.fn(),
 }));
 
+vi.mock("server-only", () => ({}));
 vi.mock("next/navigation", () => ({ redirect: mocks.redirect }));
+vi.mock("next/headers", () => ({
+  cookies: async () => ({
+    get: mocks.cookieGet,
+    set: mocks.cookieSet,
+  }),
+}));
 vi.mock("@/shared/config/env", () => ({
   getPublicEnv: () => ({ NEXT_PUBLIC_APP_URL: "https://pockelog.vercel.app" }),
+}));
+vi.mock("@/shared/config/server-env", () => ({
+  getServerEnv: () => ({ SUPABASE_SECRET_KEY: "test-server-secret" }),
 }));
 vi.mock("@/shared/supabase/server", () => ({
   createServerClient: mocks.createServerClient,
@@ -21,6 +33,7 @@ import {
   resetPasswordAction,
 } from "@/features/auth/actions";
 import { initialAuthActionState } from "@/features/auth/action-state";
+import { createPasswordRecoveryToken } from "@/features/auth/password-recovery-state";
 
 function form(values: Record<string, string>) {
   const data = new FormData();
@@ -31,6 +44,7 @@ function form(values: Record<string, string>) {
 describe("password recovery actions", () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    mocks.cookieGet.mockReturnValue(undefined);
   });
 
   it.each([null, { message: "rate limited" }])(
@@ -73,13 +87,38 @@ describe("password recovery actions", () => {
     expect(mocks.redirect).not.toHaveBeenCalled();
   });
 
+  it("rejects an ordinary signed-in session that did not come from a recovery link", async () => {
+    const updateUser = vi.fn();
+    mocks.createServerClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: "11111111-1111-4111-8111-111111111111" } },
+          error: null,
+        }),
+        updateUser,
+        signOut: vi.fn(),
+      },
+    });
+
+    await expect(resetPasswordAction(
+      initialAuthActionState,
+      form({ password: "new-password1!", confirmPassword: "new-password1!" }),
+    )).resolves.toEqual({
+      status: "error",
+      message: "재설정 링크가 만료됐거나 유효하지 않습니다. 링크를 다시 요청해 주세요.",
+    });
+    expect(updateUser).not.toHaveBeenCalled();
+  });
+
   it("signs out the recovery session and returns to login after changing the password", async () => {
+    const userId = "11111111-1111-4111-8111-111111111111";
+    mocks.cookieGet.mockReturnValue({ value: createPasswordRecoveryToken(userId) });
     const updateUser = vi.fn().mockResolvedValue({ error: null });
     const signOut = vi.fn().mockResolvedValue({ error: null });
     mocks.createServerClient.mockResolvedValue({
       auth: {
         getUser: vi.fn().mockResolvedValue({
-          data: { user: { id: "11111111-1111-4111-8111-111111111111" } },
+          data: { user: { id: userId } },
           error: null,
         }),
         updateUser,
@@ -94,6 +133,35 @@ describe("password recovery actions", () => {
 
     expect(updateUser).toHaveBeenCalledWith({ password: "new-password1!" });
     expect(signOut).toHaveBeenCalledOnce();
+    expect(mocks.cookieSet).toHaveBeenCalledWith(
+      "pockelog-password-recovery",
+      "",
+      expect.objectContaining({ path: "/reset-password", maxAge: 0 }),
+    );
     expect(mocks.redirect).toHaveBeenCalledWith("/login?passwordReset=1");
+  });
+
+  it("rejects a tampered recovery marker", async () => {
+    const updateUser = vi.fn();
+    mocks.cookieGet.mockReturnValue({ value: "tampered.marker" });
+    mocks.createServerClient.mockResolvedValue({
+      auth: {
+        getUser: vi.fn().mockResolvedValue({
+          data: { user: { id: "11111111-1111-4111-8111-111111111111" } },
+          error: null,
+        }),
+        updateUser,
+        signOut: vi.fn(),
+      },
+    });
+
+    const result = await resetPasswordAction(
+      initialAuthActionState,
+      form({ password: "new-password1!", confirmPassword: "new-password1!" }),
+    );
+
+    expect(result.status).toBe("error");
+    expect(updateUser).not.toHaveBeenCalled();
+    expect(mocks.cookieSet).not.toHaveBeenCalled();
   });
 });

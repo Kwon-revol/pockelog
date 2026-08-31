@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { cookies } from "next/headers";
 
 import type { AuthActionState } from "@/features/auth/action-state";
 import {
@@ -17,6 +18,10 @@ import {
 import { getPublicEnv } from "@/shared/config/env";
 import { createServerClient } from "@/shared/supabase/server";
 import { createSupabaseAuthGateway } from "@/features/auth/supabase-gateway";
+import {
+  isValidPasswordRecoveryToken,
+  PASSWORD_RECOVERY_COOKIE,
+} from "@/features/auth/password-recovery-state";
 
 function formValue(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -145,7 +150,13 @@ export async function resetPasswordAction(
 
   const supabase = await createServerClient();
   const { data: userData, error: userError } = await supabase.auth.getUser();
-  if (userError || !userData.user) {
+  const cookieStore = await cookies();
+  const recoveryToken = cookieStore.get(PASSWORD_RECOVERY_COOKIE)?.value;
+  if (
+    userError
+    || !userData.user
+    || !isValidPasswordRecoveryToken(recoveryToken, userData.user.id)
+  ) {
     return {
       status: "error",
       message: "재설정 링크가 만료됐거나 유효하지 않습니다. 링크를 다시 요청해 주세요.",
@@ -162,6 +173,14 @@ export async function resetPasswordAction(
       message: "재설정 링크가 만료됐거나 유효하지 않습니다. 링크를 다시 요청해 주세요.",
     };
   }
+
+  cookieStore.set(PASSWORD_RECOVERY_COOKIE, "", {
+    httpOnly: true,
+    secure: process.env.NODE_ENV === "production",
+    sameSite: "lax",
+    path: "/reset-password",
+    maxAge: 0,
+  });
 
   try {
     await supabase.auth.signOut();

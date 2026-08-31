@@ -303,6 +303,36 @@ describe("LedgerScreen", () => {
     expect(screen.getByTestId("balance-total")).toHaveTextContent("2,800,000원");
   });
 
+  it("removes a successfully trashed income from the list and summary", async () => {
+    const user = userEvent.setup();
+    const incomeItem = {
+      ...fixture.page.items[0],
+      type: "income" as const,
+      description: "급여",
+      amount: 2800000,
+      category: fixture.categories[1],
+    };
+    render(
+      <LedgerScreen
+        initialData={{
+          ...fixture,
+          page: { items: [incomeItem], nextCursor: null },
+          summary: { incomeTotal: 2800000, expenseTotal: 0, balance: 2800000 },
+        }}
+        createAction={successAction}
+        updateAction={successAction}
+        trashAction={async () => ({ status: "success", message: "내역을 휴지통으로 이동했어요." })}
+      />,
+    );
+
+    await user.click(screen.getAllByRole("button", { name: /급여/ })[0]);
+    await user.click(within(screen.getByRole("dialog", { name: "내역 수정" })).getByRole("button", { name: "삭제" }));
+
+    await waitFor(() => expect(screen.queryByRole("button", { name: /급여/ })).not.toBeInTheDocument());
+    expect(screen.getByTestId("income-total")).toHaveTextContent("0원");
+    expect(screen.getByTestId("balance-total")).toHaveTextContent("0원");
+  });
+
   it("keeps the edit panel open when the trash request is rejected", async () => {
     const user = userEvent.setup();
     render(
