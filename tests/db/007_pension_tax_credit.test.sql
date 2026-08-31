@@ -218,9 +218,8 @@ select is(
   50000000::bigint,
   '로그인 사용자는 본인 과세연도 설정을 조회한다'
 );
-select is(
-  public.upsert_my_tax_profile(2026, 51000000),
-  null::void,
+select lives_ok(
+  $$select public.upsert_my_tax_profile(2026, 51000000)$$,
   '로그인 사용자는 저장 함수로 본인 과세연도 설정을 다시 저장한다'
 );
 select is(
