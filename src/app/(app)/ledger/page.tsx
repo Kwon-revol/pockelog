@@ -31,7 +31,7 @@ export default async function LedgerPage({
     <LedgerScreen
       createAction={createTransactionAction}
       initialData={data}
-      key={JSON.stringify([data.filters, data.summary, data.page.items])}
+      key={JSON.stringify([data.filters, data.summary, data.page.items, data.initialEditorItem?.id, data.initialCategoryId])}
       trashAction={trashTransactionAction}
       updateAction={updateTransactionAction}
     />

@@ -1,3 +1,5 @@
+import type { TaxCategoryCode } from "@/features/tax/types";
+
 export type TransactionType = "income" | "expense";
 export type TransactionSort = "newest" | "oldest";
 
@@ -6,6 +8,7 @@ export type CategoryOption = {
   name: string;
   color: string;
   type: TransactionType;
+  systemCode: TaxCategoryCode | null;
 };
 
 export type TransactionCursor = {
@@ -64,6 +67,8 @@ export type LedgerPageData = {
   filters: TransactionFilters;
   page: TransactionPage;
   summary: TransactionSummary;
+  initialEditorItem: TransactionListItem | null;
+  initialCategoryId: string | null;
 };
 
 export type TransactionActionState = {

@@ -2,7 +2,7 @@ begin;
 set local search_path = public, extensions;
 
 create extension if not exists pgtap with schema extensions;
-select plan(7);
+select plan(9);
 
 insert into auth.users (
   id,
@@ -79,8 +79,32 @@ select is(
     join public.ledgers as l on l.id = c.ledger_id
     where l.owner_id = '10000000-0000-0000-0000-000000000001'
   ),
-  15::bigint,
-  '기본 수입·지출 분류 열다섯 개를 만든다'
+  17::bigint,
+  '연금저축·IRP를 포함한 기본 수입·지출 분류 열일곱 개를 만든다'
+);
+
+select is(
+  (
+    select count(*)
+    from public.categories as category
+    join public.ledgers as ledger on ledger.id = category.ledger_id
+    where ledger.owner_id = '10000000-0000-0000-0000-000000000001'
+      and category.system_code = 'pension_savings'
+  ),
+  1::bigint,
+  '가입 시 개인 장부에 연금저축 시스템 분류 하나를 만든다'
+);
+
+select is(
+  (
+    select count(*)
+    from public.categories as category
+    join public.ledgers as ledger on ledger.id = category.ledger_id
+    where ledger.owner_id = '10000000-0000-0000-0000-000000000001'
+      and category.system_code = 'irp'
+  ),
+  1::bigint,
+  '가입 시 개인 장부에 IRP 시스템 분류 하나를 만든다'
 );
 
 select * from finish();

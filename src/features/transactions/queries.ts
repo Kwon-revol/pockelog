@@ -9,7 +9,10 @@ import {
   toTransactionPage,
   type TransactionRow,
 } from "@/features/transactions/query-utils";
-import { normalizeTransactionFilters } from "@/features/transactions/schemas";
+import {
+  normalizeTransactionFilters,
+  transactionIdSchema,
+} from "@/features/transactions/schemas";
 import { resolveTransactionContext } from "@/features/transactions/supabase-gateway";
 import type {
   CategoryOption,
@@ -17,12 +20,21 @@ import type {
   TransactionCursor,
   TransactionFilters,
   TransactionPage,
+  TransactionListItem,
   TransactionSummary,
 } from "@/features/transactions/types";
 import { createServerClient } from "@/shared/supabase/server";
+import type { TaxCategoryCode } from "@/features/tax/types";
 
 type ServerClient = Awaited<ReturnType<typeof createServerClient>>;
 type SearchParams = Record<string, string | string[] | undefined>;
+type CategoryRow = {
+  id: string;
+  name: string;
+  color: string;
+  type: CategoryOption["type"];
+  system_code: string | null;
+};
 
 export class TransactionAuthenticationError extends Error {}
 export class TransactionQueryError extends Error {}
@@ -39,7 +51,7 @@ async function listTransactions(
   const ascending = filters.sort === "oldest";
   let query = supabase
     .from("transactions")
-    .select("id,type,occurred_on,description,amount,memo,created_by,created_at,category:categories!transactions_category_id_fkey(id,name,color,type)")
+    .select("id,type,occurred_on,description,amount,memo,created_by,created_at,category:categories!transactions_category_id_fkey(id,name,color,type,system_code)")
     .eq("ledger_id", ledgerId)
     .gte("occurred_on", filters.startOn)
     .lt("occurred_on", filters.endExclusive)
@@ -114,13 +126,65 @@ async function getCategories(
 ): Promise<CategoryOption[]> {
   const { data, error } = await supabase
     .from("categories")
-    .select("id,name,color,type")
+    .select("id,name,color,type,system_code")
     .eq("ledger_id", ledgerId)
     .eq("is_active", true)
     .order("type")
     .order("sort_order");
   if (error) throw new TransactionQueryError("분류를 불러오지 못했습니다.");
-  return (data ?? []) as CategoryOption[];
+  return ((data ?? []) as unknown as CategoryRow[]).map((category) => ({
+    id: category.id,
+    name: category.name,
+    color: category.color,
+    type: category.type,
+    systemCode: isTaxCategoryCode(category.system_code) ? category.system_code : null,
+  }));
+}
+
+function singleSearchParam(value: string | string[] | undefined) {
+  return Array.isArray(value) ? value[0] : value;
+}
+
+function isTaxCategoryCode(value: string | null): value is TaxCategoryCode {
+  return value === "pension_savings" || value === "irp";
+}
+
+function getInitialCategoryId(
+  rawNewPreset: string | string[] | undefined,
+  categories: CategoryOption[],
+) {
+  const newPreset = singleSearchParam(rawNewPreset);
+  if (!isTaxCategoryCode(newPreset ?? null)) return null;
+  return categories.find((category) => (
+    category.type === "expense" && category.systemCode === newPreset
+  ))?.id ?? null;
+}
+
+async function getInitialEditorItem(
+  supabase: ServerClient,
+  rawTransactionId: string | string[] | undefined,
+  ledgerId: string,
+  currentUserId: string,
+  ownerId: string,
+): Promise<TransactionListItem | null> {
+  const parsedId = transactionIdSchema.safeParse(singleSearchParam(rawTransactionId));
+  if (!parsedId.success) return null;
+
+  const { data, error } = await supabase
+    .from("transactions")
+    .select("id,type,occurred_on,description,amount,memo,created_by,created_at,category:categories!transactions_category_id_fkey(id,name,color,type,system_code)")
+    .eq("id", parsedId.data)
+    .eq("ledger_id", ledgerId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (error || !data) return null;
+
+  const item = toTransactionPage([data as unknown as TransactionRow], {
+    currentUserId,
+    ownerId,
+    creatorNames: new Map(),
+  }).items[0];
+  return item?.canManage ? item : null;
 }
 
 export async function getLedgerPageData(
@@ -136,10 +200,11 @@ export async function getLedgerPageData(
     searchParams,
     getLedgerPeriod(now, ledger.periodStartDay),
   );
-  const [categories, page, summary] = await Promise.all([
+  const [categories, page, summary, initialEditorItem] = await Promise.all([
     getCategories(supabase, ledger.id),
     listTransactions(supabase, ledger.id, filters, null, context.userId, ledger.ownerId, ledger.kind),
     getSummary(supabase, ledger.id, filters),
+    getInitialEditorItem(supabase, searchParams.edit, ledger.id, context.userId, ledger.ownerId),
   ]);
   return {
     ledger: { id: ledger.id, name: ledger.name, periodStartDay: ledger.periodStartDay, kind: ledger.kind },
@@ -147,6 +212,8 @@ export async function getLedgerPageData(
     filters,
     page,
     summary,
+    initialEditorItem,
+    initialCategoryId: getInitialCategoryId(searchParams.new, categories),
   };
 }
 

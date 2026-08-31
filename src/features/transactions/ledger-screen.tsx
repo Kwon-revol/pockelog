@@ -27,7 +27,9 @@ type LedgerScreenProps = {
 };
 
 export function LedgerScreen({ initialData, createAction, updateAction, trashAction, loadPage }: LedgerScreenProps) {
-  const [selected, setSelected] = useState<TransactionListItem | null | undefined>(undefined);
+  const [selected, setSelected] = useState<TransactionListItem | null | undefined>(
+    initialData.initialEditorItem ?? (initialData.initialCategoryId ? null : undefined),
+  );
   const pages = useTransactionPages(initialData.page, initialData.filters, loadPage);
 
   const editAction: TransactionFormAction = selected
@@ -86,6 +88,7 @@ export function LedgerScreen({ initialData, createAction, updateAction, trashAct
         <TransactionForm
           action={editAction}
           categories={initialData.categories}
+          initialCategoryId={initialData.initialCategoryId}
           item={selected}
           key={selected?.id ?? "new"}
           onClose={() => setSelected(undefined)}
