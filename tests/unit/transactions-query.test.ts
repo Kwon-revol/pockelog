@@ -34,7 +34,19 @@ function thenableQuery(result: unknown) {
   return query;
 }
 
-function ledgerPageClient() {
+function ledgerPageClient(categories: Array<{
+  id: string;
+  name: string;
+  color: string;
+  type: "expense";
+  system_code: string | null;
+}> = [{
+  id: "88888888-8888-4888-8888-888888888888",
+  name: "연금저축",
+  color: "#10B981",
+  type: "expense" as const,
+  system_code: "pension_savings",
+}]) {
   const editorRow = {
     id: editorTransactionId,
     type: "expense" as const,
@@ -49,6 +61,7 @@ function ledgerPageClient() {
       name: "연금저축",
       color: "#10B981",
       type: "expense" as const,
+      system_code: "pension_savings",
     },
   };
   const ledgerQuery = thenableQuery({
@@ -59,7 +72,7 @@ function ledgerPageClient() {
     data: { id: "ledger-1", name: "내 장부", period_start_day: 1, owner_id: "user-1", kind: "personal" },
     error: null,
   }) });
-  const categoriesQuery = thenableQuery({ data: [editorRow.category], error: null });
+  const categoriesQuery = thenableQuery({ data: categories, error: null });
   const listQuery = thenableQuery({ data: [], error: null });
   const editorQuery = thenableQuery({ data: editorRow, error: null });
   Object.assign(editorQuery, { maybeSingle: vi.fn().mockResolvedValue({ data: editorRow, error: null }) });
@@ -185,5 +198,65 @@ describe("transaction query boundaries", () => {
     expect(fake.editorQuery.eq).toHaveBeenCalledWith("id", editorTransactionId);
     expect(fake.editorQuery.eq).toHaveBeenCalledWith("ledger_id", "ledger-1");
     expect(fake.editorQuery.is).toHaveBeenCalledWith("deleted_at", null);
+  });
+
+  it("preselects a renamed pension-savings category by its immutable system code", async () => {
+    const fake = ledgerPageClient([{
+      id: "99999999-9999-4999-8999-999999999999",
+      name: "노후를 위한 저축",
+      color: "#10B981",
+      type: "expense" as const,
+      system_code: "pension_savings",
+    }]);
+    serverMocks.createServerClient.mockResolvedValue(fake.client);
+    serverMocks.resolveTransactionContext.mockResolvedValue({ userId: "user-1", ledgerId: "ledger-1" });
+
+    const result = await getLedgerPageData(
+      { new: "pension_savings" },
+      new Date("2026-08-28T00:00:00+09:00"),
+    );
+
+    expect((result as unknown as { initialCategoryId: string | null }).initialCategoryId)
+      .toBe("99999999-9999-4999-8999-999999999999");
+    expect((result.categories[0] as unknown as { systemCode: string | null }).systemCode)
+      .toBe("pension_savings");
+  });
+
+  it("ignores an unknown new preset when no active matching category is available", async () => {
+    const fake = ledgerPageClient([{
+      id: "99999999-9999-4999-8999-999999999999",
+      name: "연금저축",
+      color: "#10B981",
+      type: "expense" as const,
+      system_code: "pension_savings",
+    }]);
+    serverMocks.createServerClient.mockResolvedValue(fake.client);
+    serverMocks.resolveTransactionContext.mockResolvedValue({ userId: "user-1", ledgerId: "ledger-1" });
+
+    const result = await getLedgerPageData(
+      { new: "unknown" },
+      new Date("2026-08-28T00:00:00+09:00"),
+    );
+
+    expect((result as unknown as { initialCategoryId: string | null }).initialCategoryId).toBeNull();
+  });
+
+  it("does not preselect when the active categories omit the requested system code", async () => {
+    const fake = ledgerPageClient([{
+      id: "99999999-9999-4999-8999-999999999999",
+      name: "식비",
+      color: "#F97316",
+      type: "expense" as const,
+      system_code: null,
+    }]);
+    serverMocks.createServerClient.mockResolvedValue(fake.client);
+    serverMocks.resolveTransactionContext.mockResolvedValue({ userId: "user-1", ledgerId: "ledger-1" });
+
+    const result = await getLedgerPageData(
+      { new: "irp" },
+      new Date("2026-08-28T00:00:00+09:00"),
+    );
+
+    expect((result as unknown as { initialCategoryId: string | null }).initialCategoryId).toBeNull();
   });
 });

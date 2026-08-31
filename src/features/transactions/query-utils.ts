@@ -16,7 +16,12 @@ export type TransactionRow = {
   memo: string | null;
   created_by: string;
   created_at: string;
-  category: CategoryOption | CategoryOption[];
+  category: TransactionCategoryRow | TransactionCategoryRow[];
+};
+
+type TransactionCategoryRow = Omit<CategoryOption, "systemCode"> & {
+  system_code?: string | null;
+  systemCode?: CategoryOption["systemCode"];
 };
 
 export function getCreatorProfileSource(kind: "personal" | "shared") {
@@ -45,21 +50,30 @@ export function sanitizeSearchTerm(value: string) {
 export function toTransactionPage(rows: TransactionRow[], viewer: TransactionViewer): TransactionPage {
   const hasNext = rows.length > 50;
   const visible = rows.slice(0, 50);
-  const items = visible.map((row) => ({
+  const items = visible.map((row) => {
+    const category = Array.isArray(row.category) ? row.category[0] : row.category;
+    return {
     id: row.id,
     type: row.type,
     occurredOn: row.occurred_on,
     description: row.description,
     amount: Number(row.amount),
     memo: row.memo ?? "",
-    category: Array.isArray(row.category) ? row.category[0] : row.category,
+    category: {
+      id: category.id,
+      name: category.name,
+      color: category.color,
+      type: category.type,
+      systemCode: category.systemCode ?? toTaxCategoryCode(category.system_code),
+    },
     createdBy: {
       id: row.created_by,
       name: viewer.creatorNames.get(row.created_by) ?? "알 수 없는 사용자",
     },
     canManage: viewer.currentUserId === viewer.ownerId || viewer.currentUserId === row.created_by,
     createdAt: row.created_at,
-  }));
+    };
+  });
   const last = items.at(-1);
 
   return {
@@ -68,4 +82,8 @@ export function toTransactionPage(rows: TransactionRow[], viewer: TransactionVie
       ? encodeCursor({ occurredOn: last.occurredOn, createdAt: last.createdAt, id: last.id })
       : null,
   };
+}
+
+function toTaxCategoryCode(value: string | null | undefined): CategoryOption["systemCode"] {
+  return value === "pension_savings" || value === "irp" ? value : null;
 }

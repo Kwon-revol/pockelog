@@ -16,8 +16,8 @@ vi.mock("next/navigation", () => ({
 const fixture: LedgerPageData = {
   ledger: { id: "ledger-1", name: "내 장부", periodStartDay: 1, kind: "personal" },
   categories: [
-    { id: "11111111-1111-4111-8111-111111111111", name: "식비", color: "#F97316", type: "expense" },
-    { id: "22222222-2222-4222-8222-222222222222", name: "급여", color: "#10B981", type: "income" },
+    { id: "11111111-1111-4111-8111-111111111111", name: "식비", color: "#F97316", type: "expense", systemCode: null },
+    { id: "22222222-2222-4222-8222-222222222222", name: "급여", color: "#10B981", type: "income", systemCode: null },
   ],
   filters: {
     startOn: "2026-08-01",
@@ -38,13 +38,14 @@ const fixture: LedgerPageData = {
       memo: "",
       createdBy: { id: "user-1", name: "권혁" },
       canManage: true,
-      category: { id: "11111111-1111-4111-8111-111111111111", name: "식비", color: "#F97316", type: "expense" },
+      category: { id: "11111111-1111-4111-8111-111111111111", name: "식비", color: "#F97316", type: "expense", systemCode: null },
       createdAt: "2026-08-26T01:00:00.000Z",
     }],
     nextCursor: null,
   },
   summary: { incomeTotal: 2800000, expenseTotal: 46500, balance: 2753500 },
   initialEditorItem: null,
+  initialCategoryId: null,
 };
 
 const successAction = async (): Promise<TransactionActionState> => ({ status: "success" });
@@ -94,6 +95,36 @@ describe("LedgerScreen", () => {
     expect(screen.getByRole("dialog", { name: "내역 추가" })).toBeVisible();
   });
 
+  it("opens a new expense form with the requested pension category selected", () => {
+    const pensionCategoryId = "99999999-9999-4999-8999-999999999999";
+    const presetFixture = {
+      ...fixture,
+      categories: [{
+        id: pensionCategoryId,
+        name: "내가 바꾼 연금저축 이름",
+        color: "#10B981",
+        type: "expense" as const,
+        systemCode: "pension_savings" as const,
+      }],
+      initialCategoryId: pensionCategoryId,
+    } as unknown as LedgerPageData;
+    render(
+      <LedgerScreen initialData={presetFixture} createAction={successAction} updateAction={successAction} trashAction={successAction} />,
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "내역 추가" });
+    expect(within(dialog).getByRole("radio", { name: "지출" })).toBeChecked();
+    expect(within(dialog).getByLabelText("분류")).toHaveValue(pensionCategoryId);
+  });
+
+  it("does not open a form without a recognized new preset", () => {
+    render(
+      <LedgerScreen initialData={fixture} createAction={successAction} updateAction={successAction} trashAction={successAction} />,
+    );
+
+    expect(screen.queryByRole("dialog", { name: "내역 추가" })).not.toBeInTheDocument();
+  });
+
   it("resets the category when the transaction type changes", async () => {
     const user = userEvent.setup();
     render(
@@ -137,6 +168,7 @@ describe("LedgerScreen", () => {
       name: "예전 식비",
       color: "#64748B",
       type: "expense" as const,
+      systemCode: null,
     };
     const inactiveItem = { ...fixture.page.items[0], category: inactiveCategory };
     render(

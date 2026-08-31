@@ -24,9 +24,17 @@ import type {
   TransactionSummary,
 } from "@/features/transactions/types";
 import { createServerClient } from "@/shared/supabase/server";
+import type { TaxCategoryCode } from "@/features/tax/types";
 
 type ServerClient = Awaited<ReturnType<typeof createServerClient>>;
 type SearchParams = Record<string, string | string[] | undefined>;
+type CategoryRow = {
+  id: string;
+  name: string;
+  color: string;
+  type: CategoryOption["type"];
+  system_code: string | null;
+};
 
 export class TransactionAuthenticationError extends Error {}
 export class TransactionQueryError extends Error {}
@@ -43,7 +51,7 @@ async function listTransactions(
   const ascending = filters.sort === "oldest";
   let query = supabase
     .from("transactions")
-    .select("id,type,occurred_on,description,amount,memo,created_by,created_at,category:categories!transactions_category_id_fkey(id,name,color,type)")
+    .select("id,type,occurred_on,description,amount,memo,created_by,created_at,category:categories!transactions_category_id_fkey(id,name,color,type,system_code)")
     .eq("ledger_id", ledgerId)
     .gte("occurred_on", filters.startOn)
     .lt("occurred_on", filters.endExclusive)
@@ -118,17 +126,38 @@ async function getCategories(
 ): Promise<CategoryOption[]> {
   const { data, error } = await supabase
     .from("categories")
-    .select("id,name,color,type")
+    .select("id,name,color,type,system_code")
     .eq("ledger_id", ledgerId)
     .eq("is_active", true)
     .order("type")
     .order("sort_order");
   if (error) throw new TransactionQueryError("분류를 불러오지 못했습니다.");
-  return (data ?? []) as CategoryOption[];
+  return ((data ?? []) as unknown as CategoryRow[]).map((category) => ({
+    id: category.id,
+    name: category.name,
+    color: category.color,
+    type: category.type,
+    systemCode: isTaxCategoryCode(category.system_code) ? category.system_code : null,
+  }));
 }
 
 function singleSearchParam(value: string | string[] | undefined) {
   return Array.isArray(value) ? value[0] : value;
+}
+
+function isTaxCategoryCode(value: string | null): value is TaxCategoryCode {
+  return value === "pension_savings" || value === "irp";
+}
+
+function getInitialCategoryId(
+  rawNewPreset: string | string[] | undefined,
+  categories: CategoryOption[],
+) {
+  const newPreset = singleSearchParam(rawNewPreset);
+  if (!isTaxCategoryCode(newPreset ?? null)) return null;
+  return categories.find((category) => (
+    category.type === "expense" && category.systemCode === newPreset
+  ))?.id ?? null;
 }
 
 async function getInitialEditorItem(
@@ -143,7 +172,7 @@ async function getInitialEditorItem(
 
   const { data, error } = await supabase
     .from("transactions")
-    .select("id,type,occurred_on,description,amount,memo,created_by,created_at,category:categories!transactions_category_id_fkey(id,name,color,type)")
+    .select("id,type,occurred_on,description,amount,memo,created_by,created_at,category:categories!transactions_category_id_fkey(id,name,color,type,system_code)")
     .eq("id", parsedId.data)
     .eq("ledger_id", ledgerId)
     .is("deleted_at", null)
@@ -184,6 +213,7 @@ export async function getLedgerPageData(
     page,
     summary,
     initialEditorItem,
+    initialCategoryId: getInitialCategoryId(searchParams.new, categories),
   };
 }
 
