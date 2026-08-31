@@ -1,6 +1,7 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { redirect } from "next/navigation";
 
 import { formDataToTransactionInput } from "@/features/transactions/schemas";
 import { createSupabaseTransactionGateway } from "@/features/transactions/supabase-gateway";
@@ -29,7 +30,10 @@ export async function createTransactionAction(
   if (!parsed.success) return invalidFormState(parsed);
   const gateway = await createSupabaseTransactionGateway();
   const result = await createTransaction(parsed.data, gateway);
-  if (result.status === "success") revalidatePath("/ledger");
+  if (result.status === "success") {
+    revalidatePath("/ledger");
+    if (formData.get("pensionContributionPreset") === "1") redirect("/ledger");
+  }
   return result;
 }
 

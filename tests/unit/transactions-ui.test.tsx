@@ -9,10 +9,8 @@ import type {
   TransactionPage,
 } from "@/features/transactions/types";
 
-const routerMocks = vi.hoisted(() => ({ replace: vi.fn() }));
-
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn(), replace: routerMocks.replace }),
+  useRouter: () => ({ push: vi.fn(), replace: vi.fn() }),
 }));
 
 const fixture: LedgerPageData = {
@@ -76,7 +74,6 @@ describe("LedgerScreen", () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
-    routerMocks.replace.mockReset();
   });
 
   it("shows formatted totals and opens the add panel", async () => {
@@ -120,9 +117,10 @@ describe("LedgerScreen", () => {
     expect(within(dialog).getByLabelText("분류")).toHaveValue(pensionCategoryId);
   });
 
-  it("consumes a saved pension preset before the ledger screen remounts", async () => {
+  it("submits the pension preset marker with a preset create", async () => {
     const user = userEvent.setup();
     const pensionCategoryId = "99999999-9999-4999-8999-999999999999";
+    let submitted: FormData | null = null;
     const presetFixture = {
       ...fixture,
       categories: [{
@@ -134,8 +132,16 @@ describe("LedgerScreen", () => {
       }],
       initialCategoryId: pensionCategoryId,
     } as LedgerPageData;
-    const { rerender } = render(
-      <LedgerScreen key="with-preset" initialData={presetFixture} createAction={successAction} updateAction={successAction} trashAction={successAction} />,
+    render(
+      <LedgerScreen
+        initialData={presetFixture}
+        createAction={async (_state, formData) => {
+          submitted = formData;
+          return { status: "error", message: "저장 실패" };
+        }}
+        updateAction={successAction}
+        trashAction={successAction}
+      />,
     );
 
     const dialog = screen.getByRole("dialog", { name: "내역 추가" });
@@ -143,11 +149,7 @@ describe("LedgerScreen", () => {
     await user.type(within(dialog).getByRole("textbox", { name: /금액/ }), "500000");
     await user.click(within(dialog).getByRole("button", { name: "저장" }));
 
-    await waitFor(() => expect(routerMocks.replace).toHaveBeenCalledWith("/ledger"));
-    rerender(
-      <LedgerScreen key="without-preset" initialData={{ ...presetFixture, initialCategoryId: null }} createAction={successAction} updateAction={successAction} trashAction={successAction} />,
-    );
-    expect(screen.queryByRole("dialog", { name: "내역 추가" })).not.toBeInTheDocument();
+    await waitFor(() => expect(submitted?.get("pensionContributionPreset")).toBe("1"));
   });
 
   it("does not open a form without a recognized new preset", () => {

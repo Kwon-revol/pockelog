@@ -23,7 +23,6 @@ type TransactionFormProps = {
   action: TransactionFormAction;
   trashAction: (() => Promise<TransactionActionState>) | null;
   onClose: () => void;
-  onSuccess?: () => void;
 };
 
 function todayInSeoul() {
@@ -41,7 +40,7 @@ function FieldError({ errors }: { errors?: string[] }) {
   return errors?.[0] ? <p className="mt-1 text-xs font-medium text-rose-600">{errors[0]}</p> : null;
 }
 
-export function TransactionForm({ categories, initialCategoryId, item, action, trashAction, onClose, onSuccess }: TransactionFormProps) {
+export function TransactionForm({ categories, initialCategoryId, item, action, trashAction, onClose }: TransactionFormProps) {
   const [state, formAction] = useActionState(action, initialTransactionActionState);
   const [type, setType] = useState<TransactionType>(item?.type ?? "expense");
   const [categoryId, setCategoryId] = useState(item?.category.id ?? initialCategoryId ?? "");
@@ -51,11 +50,8 @@ export function TransactionForm({ categories, initialCategoryId, item, action, t
   const mode = item ? "수정" : "추가";
 
   useEffect(() => {
-    if (state.status === "success") {
-      onSuccess?.();
-      onClose();
-    }
-  }, [onClose, onSuccess, state.status]);
+    if (state.status === "success") onClose();
+  }, [onClose, state.status]);
 
   const categorySource = item && !categories.some((category) => category.id === item.category.id)
     ? [...categories, item.category]
@@ -90,6 +86,7 @@ export function TransactionForm({ categories, initialCategoryId, item, action, t
 
         <form action={formAction} className="mt-7 space-y-5" noValidate>
           <input name="idempotencyKey" type="hidden" value={item ? "" : idempotencyKey} />
+          {!item && initialCategoryId ? <input name="pensionContributionPreset" type="hidden" value="1" /> : null}
           <fieldset>
             <legend className="text-sm font-bold text-slate-700">유형</legend>
             <div className="mt-2 grid grid-cols-2 rounded-2xl bg-slate-100 p-1">
