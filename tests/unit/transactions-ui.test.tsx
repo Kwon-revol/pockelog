@@ -9,8 +9,10 @@ import type {
   TransactionPage,
 } from "@/features/transactions/types";
 
+const routerMocks = vi.hoisted(() => ({ replace: vi.fn() }));
+
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: vi.fn(), replace: routerMocks.replace }),
 }));
 
 const fixture: LedgerPageData = {
@@ -74,6 +76,7 @@ describe("LedgerScreen", () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+    routerMocks.replace.mockReset();
   });
 
   it("shows formatted totals and opens the add panel", async () => {
@@ -115,6 +118,36 @@ describe("LedgerScreen", () => {
     const dialog = screen.getByRole("dialog", { name: "내역 추가" });
     expect(within(dialog).getByRole("radio", { name: "지출" })).toBeChecked();
     expect(within(dialog).getByLabelText("분류")).toHaveValue(pensionCategoryId);
+  });
+
+  it("consumes a saved pension preset before the ledger screen remounts", async () => {
+    const user = userEvent.setup();
+    const pensionCategoryId = "99999999-9999-4999-8999-999999999999";
+    const presetFixture = {
+      ...fixture,
+      categories: [{
+        id: pensionCategoryId,
+        name: "연금저축",
+        color: "#10B981",
+        type: "expense" as const,
+        systemCode: "pension_savings" as const,
+      }],
+      initialCategoryId: pensionCategoryId,
+    } as LedgerPageData;
+    const { rerender } = render(
+      <LedgerScreen key="with-preset" initialData={presetFixture} createAction={successAction} updateAction={successAction} trashAction={successAction} />,
+    );
+
+    const dialog = screen.getByRole("dialog", { name: "내역 추가" });
+    await user.type(within(dialog).getByLabelText("내용"), "8월 연금저축");
+    await user.type(within(dialog).getByRole("textbox", { name: /금액/ }), "500000");
+    await user.click(within(dialog).getByRole("button", { name: "저장" }));
+
+    await waitFor(() => expect(routerMocks.replace).toHaveBeenCalledWith("/ledger"));
+    rerender(
+      <LedgerScreen key="without-preset" initialData={{ ...presetFixture, initialCategoryId: null }} createAction={successAction} updateAction={successAction} trashAction={successAction} />,
+    );
+    expect(screen.queryByRole("dialog", { name: "내역 추가" })).not.toBeInTheDocument();
   });
 
   it("does not open a form without a recognized new preset", () => {

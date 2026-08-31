@@ -1,6 +1,7 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 
 import { TransactionForm, type TransactionFormAction } from "@/features/transactions/transaction-form";
 import { TransactionList } from "@/features/transactions/transaction-list";
@@ -27,6 +28,7 @@ type LedgerScreenProps = {
 };
 
 export function LedgerScreen({ initialData, createAction, updateAction, trashAction, loadPage }: LedgerScreenProps) {
+  const router = useRouter();
   const [selected, setSelected] = useState<TransactionListItem | null | undefined>(
     initialData.initialEditorItem ?? (initialData.initialCategoryId ? null : undefined),
   );
@@ -92,6 +94,7 @@ export function LedgerScreen({ initialData, createAction, updateAction, trashAct
           item={selected}
           key={selected?.id ?? "new"}
           onClose={() => setSelected(undefined)}
+          onSuccess={selected === null && initialData.initialCategoryId ? () => router.replace("/ledger") : undefined}
           trashAction={selected ? () => trashAction(selected.id) : null}
         />
       ) : null}
