@@ -284,6 +284,25 @@ describe("LedgerScreen", () => {
     expect(dialog).toBeVisible();
   });
 
+  it("removes a successfully trashed expense from the list and summary", async () => {
+    const user = userEvent.setup();
+    render(
+      <LedgerScreen
+        initialData={fixture}
+        createAction={successAction}
+        updateAction={successAction}
+        trashAction={async () => ({ status: "success", message: "내역을 휴지통으로 이동했어요." })}
+      />,
+    );
+
+    await user.click(screen.getAllByRole("button", { name: /점심/ })[0]);
+    await user.click(within(screen.getByRole("dialog", { name: "내역 수정" })).getByRole("button", { name: "삭제" }));
+
+    await waitFor(() => expect(screen.queryByText("점심")).not.toBeInTheDocument());
+    expect(screen.getByTestId("expense-total")).toHaveTextContent("0원");
+    expect(screen.getByTestId("balance-total")).toHaveTextContent("2,800,000원");
+  });
+
   it("keeps the edit panel open when the trash request is rejected", async () => {
     const user = userEvent.setup();
     render(

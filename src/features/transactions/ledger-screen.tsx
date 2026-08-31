@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { TransactionForm, type TransactionFormAction } from "@/features/transactions/transaction-form";
 import { TransactionList } from "@/features/transactions/transaction-list";
@@ -30,16 +30,38 @@ export function LedgerScreen({ initialData, createAction, updateAction, trashAct
   const [selected, setSelected] = useState<TransactionListItem | null | undefined>(
     initialData.initialEditorItem ?? (initialData.initialCategoryId ? null : undefined),
   );
+  const [summary, setSummary] = useState(initialData.summary);
   const pages = useTransactionPages(initialData.page, initialData.filters, loadPage);
+
+  useEffect(() => setSummary(initialData.summary), [initialData.summary]);
+
+  const moveSelectedToTrash = async (item: TransactionListItem) => {
+    const result = await trashAction(item.id);
+    if (result.status === "success") {
+      pages.removeItem(item.id);
+      setSummary((current) => item.type === "expense"
+        ? {
+            ...current,
+            expenseTotal: current.expenseTotal - item.amount,
+            balance: current.balance + item.amount,
+          }
+        : {
+            ...current,
+            incomeTotal: current.incomeTotal - item.amount,
+            balance: current.balance - item.amount,
+          });
+    }
+    return result;
+  };
 
   const editAction: TransactionFormAction = selected
     ? (state, formData) => updateAction(selected.id, state, formData)
     : createAction;
 
   const summaryCards = [
-    { label: "총 수입", value: initialData.summary.incomeTotal, color: "text-emerald-700", testId: "income-total" },
-    { label: "총 지출", value: initialData.summary.expenseTotal, color: "text-rose-600", testId: "expense-total" },
-    { label: "잔액", value: initialData.summary.balance, color: initialData.summary.balance < 0 ? "text-rose-600" : "text-slate-950", testId: "balance-total" },
+    { label: "총 수입", value: summary.incomeTotal, color: "text-emerald-700", testId: "income-total" },
+    { label: "총 지출", value: summary.expenseTotal, color: "text-rose-600", testId: "expense-total" },
+    { label: "잔액", value: summary.balance, color: summary.balance < 0 ? "text-rose-600" : "text-slate-950", testId: "balance-total" },
   ];
 
   return (
@@ -92,7 +114,7 @@ export function LedgerScreen({ initialData, createAction, updateAction, trashAct
           item={selected}
           key={selected?.id ?? "new"}
           onClose={() => setSelected(undefined)}
-          trashAction={selected ? () => trashAction(selected.id) : null}
+          trashAction={selected ? () => moveSelectedToTrash(selected) : null}
         />
       ) : null}
     </div>

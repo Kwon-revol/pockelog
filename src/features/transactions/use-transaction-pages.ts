@@ -47,6 +47,16 @@ export function useTransactionPages(
   const sentinelRef = useRef<HTMLDivElement>(null);
   const requestInFlightRef = useRef(false);
 
+  useEffect(() => {
+    setItems(initialPage.items);
+    setNextCursor(initialPage.nextCursor);
+    setLoadError(null);
+  }, [initialPage]);
+
+  const removeItem = useCallback((transactionId: string) => {
+    setItems((current) => current.filter((item) => item.id !== transactionId));
+  }, []);
+
   const requestNextPage = useCallback(async () => {
     if (!nextCursor || requestInFlightRef.current) return;
     requestInFlightRef.current = true;
@@ -89,5 +99,6 @@ export function useTransactionPages(
     loadError,
     sentinelRef,
     requestNextPage,
+    removeItem,
   };
 }
