@@ -8,12 +8,23 @@ import { loginAction } from "@/features/auth/actions";
 import { FormField } from "@/shared/ui/form-field";
 import { SubmitButton } from "@/shared/ui/submit-button";
 
-export function LoginForm({ nextPath = "/ledger" }: { nextPath?: string }) {
+export function LoginForm({
+  nextPath = "/ledger",
+  notice,
+}: {
+  nextPath?: string;
+  notice?: string;
+}) {
   const [state, formAction] = useActionState(loginAction, initialAuthActionState);
 
   return (
     <form action={formAction} className="space-y-5" noValidate>
       <input type="hidden" name="next" value={nextPath} />
+      {notice ? (
+        <p className="rounded-2xl bg-emerald-50 px-4 py-3 text-sm leading-6 text-emerald-800" role="status">
+          {notice}
+        </p>
+      ) : null}
       <FormField
         label="아이디 또는 이메일"
         id="identifier"

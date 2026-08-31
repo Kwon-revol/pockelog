@@ -8,7 +8,7 @@ import { forgotPasswordAction } from "@/features/auth/actions";
 import { FormField } from "@/shared/ui/form-field";
 import { SubmitButton } from "@/shared/ui/submit-button";
 
-export function ForgotPasswordForm() {
+export function ForgotPasswordForm({ notice }: { notice?: string }) {
   const [state, formAction] = useActionState(
     forgotPasswordAction,
     initialAuthActionState,
@@ -16,6 +16,11 @@ export function ForgotPasswordForm() {
 
   return (
     <form action={formAction} className="space-y-5" noValidate>
+      {notice ? (
+        <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm leading-6 text-rose-700" role="alert">
+          {notice}
+        </p>
+      ) : null}
       <FormField
         label="가입 이메일"
         id="email"

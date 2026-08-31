@@ -112,15 +112,12 @@ export async function forgotPasswordAction(
 
   const supabase = await createServerClient();
   const env = getPublicEnv();
-  const { error } = await supabase.auth.resetPasswordForEmail(parsed.data.email, {
-    redirectTo: `${env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/reset-password`,
-  });
-
-  if (error) {
-    return {
-      status: "error",
-      message: "메일 발송 요청을 처리하지 못했습니다. 잠시 후 다시 시도해 주세요.",
-    };
+  try {
+    await supabase.auth.resetPasswordForEmail(parsed.data.email, {
+      redirectTo: `${env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/reset-password`,
+    });
+  } catch {
+    // Keep the response identical so account existence and provider state stay private.
   }
 
   return {
@@ -147,6 +144,14 @@ export async function resetPasswordAction(
   }
 
   const supabase = await createServerClient();
+  const { data: userData, error: userError } = await supabase.auth.getUser();
+  if (userError || !userData.user) {
+    return {
+      status: "error",
+      message: "재설정 링크가 만료됐거나 유효하지 않습니다. 링크를 다시 요청해 주세요.",
+    };
+  }
+
   const { error } = await supabase.auth.updateUser({
     password: parsed.data.password,
   });
@@ -158,5 +163,10 @@ export async function resetPasswordAction(
     };
   }
 
-  redirect("/ledger");
+  try {
+    await supabase.auth.signOut();
+  } catch {
+    // The password is already changed; the login screen remains the safe destination.
+  }
+  redirect("/login?passwordReset=1");
 }

@@ -16,7 +16,9 @@ export async function GET(request: NextRequest) {
     }
   }
 
-  return NextResponse.redirect(
-    new URL("/login?callbackError=1", request.url),
-  );
+  const errorPath = nextPath === "/reset-password"
+    ? "/forgot-password?invalidLink=1"
+    : "/login?callbackError=1";
+
+  return NextResponse.redirect(new URL(errorPath, request.url));
 }

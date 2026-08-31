@@ -4,7 +4,13 @@ import { ForgotPasswordForm } from "@/features/auth/forgot-password-form";
 
 export const metadata: Metadata = { title: "비밀번호 찾기" };
 
-export default function ForgotPasswordPage() {
+export default async function ForgotPasswordPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ invalidLink?: string }>;
+}) {
+  const { invalidLink } = await searchParams;
+
   return (
     <>
       <div className="mb-8 text-center">
@@ -13,7 +19,9 @@ export default function ForgotPasswordPage() {
           가입한 이메일로 재설정 링크를 보내드릴게요.
         </p>
       </div>
-      <ForgotPasswordForm />
+      <ForgotPasswordForm
+        notice={invalidLink === "1" ? "재설정 링크가 만료됐습니다. 새 링크를 요청해 주세요." : undefined}
+      />
     </>
   );
 }
