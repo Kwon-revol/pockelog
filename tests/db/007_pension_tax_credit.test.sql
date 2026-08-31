@@ -2,7 +2,7 @@ begin;
 set local search_path = public, extensions;
 
 create extension if not exists pgtap with schema extensions;
-select plan(30);
+select plan(39);
 
 select has_column('public', 'categories', 'system_code', '분류에 시스템 식별자가 존재한다');
 select has_table('public', 'user_tax_profiles', '개인 과세연도 설정 테이블이 존재한다');
@@ -17,6 +17,12 @@ select has_function(
   'get_my_pension_contributions',
   array['integer', 'integer', 'date', 'timestamp with time zone', 'uuid'],
   '본인 연금 납입 목록 함수가 존재한다'
+);
+select has_function(
+  'public',
+  'upsert_my_tax_profile',
+  array['integer', 'bigint'],
+  '본인 과세연도 설정 저장 함수가 존재한다'
 );
 select is(
   pg_get_function_result(to_regprocedure('public.get_my_pension_tax_summary(integer)')),
@@ -169,6 +175,25 @@ select throws_ok(
 insert into public.user_tax_profiles (user_id, tax_year, income_type, gross_salary)
 values ('70000000-0000-0000-0000-000000000002', 2026, 'employment', 60000000);
 
+select ok(
+  not has_function_privilege('public', 'public.upsert_my_tax_profile(integer,bigint)', 'execute'),
+  'public 역할은 과세연도 설정 저장 함수를 실행할 수 없다'
+);
+select ok(
+  not has_function_privilege('anon', 'public.upsert_my_tax_profile(integer,bigint)', 'execute'),
+  '익명 사용자는 과세연도 설정 저장 함수를 실행할 수 없다'
+);
+select ok(
+  has_function_privilege('authenticated', 'public.upsert_my_tax_profile(integer,bigint)', 'execute'),
+  '로그인 사용자만 과세연도 설정 저장 함수를 실행할 수 있다'
+);
+select throws_ok(
+  $$select public.upsert_my_tax_profile(2026, 50000000)$$,
+  '42501',
+  null,
+  '로그인하지 않은 호출은 과세연도 설정을 저장할 수 없다'
+);
+
 set local role authenticated;
 select set_config('request.jwt.claim.role', 'authenticated', true);
 select set_config('request.jwt.claim.sub', '70000000-0000-0000-0000-000000000001', true);
@@ -185,9 +210,8 @@ select throws_ok(
   '로그인 사용자는 시스템 분류 코드를 직접 변경할 수 없다'
 );
 select lives_ok(
-  $$insert into public.user_tax_profiles (user_id, tax_year, income_type, gross_salary)
-    values (auth.uid(), 2026, 'employment', 50000000)$$,
-  '로그인 사용자는 본인 과세연도 설정을 추가한다'
+  $$select public.upsert_my_tax_profile(2026, 50000000)$$,
+  '로그인 사용자는 저장 함수로 본인 과세연도 설정을 추가한다'
 );
 select is(
   (select gross_salary from public.user_tax_profiles where user_id = auth.uid() and tax_year = 2026),
@@ -195,17 +219,26 @@ select is(
   '로그인 사용자는 본인 과세연도 설정을 조회한다'
 );
 select is(
-  (
-    with changed as (
-      update public.user_tax_profiles
-      set gross_salary = 51000000
-      where user_id = auth.uid() and tax_year = 2026
-      returning 1
-    )
-    select count(*)::integer from changed
-  ),
-  1,
-  '로그인 사용자는 본인 과세연도 설정을 변경한다'
+  public.upsert_my_tax_profile(2026, 51000000),
+  null::void,
+  '로그인 사용자는 저장 함수로 본인 과세연도 설정을 다시 저장한다'
+);
+select is(
+  (select gross_salary from public.user_tax_profiles where user_id = auth.uid() and tax_year = 2026),
+  51000000::bigint,
+  '다시 저장한 총급여가 본인 설정에 반영된다'
+);
+select throws_ok(
+  $$select public.upsert_my_tax_profile(2025, 51000000)$$,
+  '22023',
+  null,
+  '지원하지 않는 과세연도는 저장하지 않는다'
+);
+select throws_ok(
+  $$select public.upsert_my_tax_profile(2026, -1)$$,
+  '22023',
+  null,
+  '음수 총급여는 저장하지 않는다'
 );
 select is(
   (
@@ -229,6 +262,21 @@ select is(
   0,
   '로그인 사용자는 다른 사용자의 과세연도 설정을 변경하지 못한다'
 );
+
+reset role;
+select is(
+  (
+    select gross_salary
+    from public.user_tax_profiles
+    where user_id = '70000000-0000-0000-0000-000000000002'
+      and tax_year = 2026
+  ),
+  60000000::bigint,
+  '본인 설정 재저장은 다른 사용자의 설정을 바꾸지 않는다'
+);
+set local role authenticated;
+select set_config('request.jwt.claim.role', 'authenticated', true);
+select set_config('request.jwt.claim.sub', '70000000-0000-0000-0000-000000000001', true);
 select ok(
   not has_function_privilege('anon', 'public.get_my_pension_tax_summary(integer)', 'execute'),
   '익명 사용자는 연금 납입 요약 함수를 실행할 수 없다'

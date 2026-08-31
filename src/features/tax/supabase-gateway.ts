@@ -12,13 +12,11 @@ export async function createSupabaseTaxGateway(): Promise<TaxGateway> {
       return user?.id ?? null;
     },
 
-    async upsertProfile(userId, input) {
-      const { error } = await supabase.from("user_tax_profiles").upsert({
-        user_id: userId,
-        tax_year: input.taxYear,
-        income_type: "employment",
-        gross_salary: input.grossSalary,
-      }, { onConflict: "user_id,tax_year" });
+    async upsertProfile(_userId, input) {
+      const { error } = await supabase.rpc("upsert_my_tax_profile", {
+        target_year: input.taxYear,
+        target_gross_salary: input.grossSalary,
+      });
       if (!error) return "saved";
       return error.code === "42501" ? "forbidden" : "error";
     },

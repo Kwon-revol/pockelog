@@ -62,6 +62,13 @@ describe("tax profile form", () => {
     ).toEqual({ taxYear: 2026, grossSalary: 55_000_000 });
   });
 
+  it.each(["", "   ", ",", ",,,"]) (
+    "rejects a salary input without any digits: %j",
+    (grossSalary) => {
+      expect(taxProfileFormSchema.safeParse({ taxYear: "2026", grossSalary }).success).toBe(false);
+    },
+  );
+
   it.each([
     { taxYear: "2025", grossSalary: "55,000,000" },
     { taxYear: "2027", grossSalary: "55,000,000" },

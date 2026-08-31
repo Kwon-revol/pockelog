@@ -147,6 +147,53 @@ on public.user_tax_profiles for delete
 to authenticated
 using (user_id = auth.uid());
 
+create or replace function public.upsert_my_tax_profile(
+  target_year integer,
+  target_gross_salary bigint
+)
+returns void
+language plpgsql
+security definer
+set search_path = ''
+as $$
+declare
+  current_user_id uuid := auth.uid();
+begin
+  if current_user_id is null then
+    raise insufficient_privilege using message = 'Authentication required';
+  end if;
+
+  if target_year <> 2026 then
+    raise exception using
+      errcode = '22023',
+      message = 'Unsupported tax year';
+  end if;
+
+  if target_gross_salary is null or target_gross_salary < 0 then
+    raise exception using
+      errcode = '22023',
+      message = 'Gross salary must be non-negative';
+  end if;
+
+  insert into public.user_tax_profiles (
+    user_id,
+    tax_year,
+    income_type,
+    gross_salary
+  )
+  values (
+    current_user_id,
+    target_year,
+    'employment',
+    target_gross_salary
+  )
+  on conflict (user_id, tax_year) do update
+  set
+    income_type = 'employment',
+    gross_salary = excluded.gross_salary;
+end;
+$$;
+
 create or replace function public.get_my_pension_tax_summary(target_year integer)
 returns table (
   pension_paid bigint,
@@ -279,6 +326,7 @@ grant select, insert, delete on table public.user_tax_profiles to authenticated;
 grant update (income_type, gross_salary) on table public.user_tax_profiles to authenticated;
 
 revoke all on function private.handle_new_ledger() from public, anon, authenticated;
+revoke all on function public.upsert_my_tax_profile(integer, bigint) from public, anon, authenticated;
 revoke all on function public.get_my_pension_tax_summary(integer) from public, anon, authenticated;
 revoke all on function public.get_my_pension_contributions(
   integer,
@@ -289,6 +337,7 @@ revoke all on function public.get_my_pension_contributions(
 ) from public, anon, authenticated;
 
 grant execute on function public.get_my_pension_tax_summary(integer) to authenticated;
+grant execute on function public.upsert_my_tax_profile(integer, bigint) to authenticated;
 grant execute on function public.get_my_pension_contributions(
   integer,
   integer,

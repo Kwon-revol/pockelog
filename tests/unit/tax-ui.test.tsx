@@ -212,6 +212,22 @@ describe("TaxScreen", () => {
     expect(within(former).getByText("읽기 전용")).toBeVisible();
   });
 
+  it("shows an edit-action error and allows the user to retry", async () => {
+    const user = userEvent.setup();
+    const editAction = vi.fn()
+      .mockResolvedValueOnce({ status: "error", message: "이 납입 내역을 편집할 수 없습니다." })
+      .mockResolvedValueOnce({ status: "success" });
+    renderScreen({ editAction });
+
+    const editButton = screen.getByRole("button", { name: "8월 연금저축 편집" });
+    await user.click(editButton);
+
+    expect(await screen.findByRole("alert")).toHaveTextContent("이 납입 내역을 편집할 수 없습니다.");
+    await user.click(editButton);
+    await waitFor(() => expect(editAction).toHaveBeenCalledTimes(2));
+    expect(screen.queryByText("이 납입 내역을 편집할 수 없습니다.")).not.toBeInTheDocument();
+  });
+
   it("automatically appends the next contribution page without end-of-list copy", async () => {
     const nextItem = {
       ...contribution,

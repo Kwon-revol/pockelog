@@ -1,6 +1,6 @@
 "use client";
 
-import type { RefObject } from "react";
+import { useState, type RefObject } from "react";
 
 import type { TaxContribution } from "@/features/tax/types";
 import type { TaxActionState } from "@/features/tax/workflows";
@@ -30,6 +30,26 @@ export function ContributionList({
   editAction,
   onRetry,
 }: ContributionListProps) {
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [editError, setEditError] = useState<string | null>(null);
+
+  async function handleEdit(transactionId: string) {
+    if (!editAction || editingId) return;
+
+    setEditingId(transactionId);
+    setEditError(null);
+    try {
+      const result = await editAction(transactionId);
+      if (result.status === "error") {
+        setEditError(result.message ?? "납입 내역 편집 화면을 열지 못했습니다.");
+      }
+    } catch {
+      setEditError("납입 내역 편집 화면을 열지 못했습니다.");
+    } finally {
+      setEditingId(null);
+    }
+  }
+
   return (
     <section aria-label="연금 납입 내역" className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
       <div className="flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between">
@@ -66,7 +86,7 @@ export function ContributionList({
                 <p className="text-sm text-slate-600"><span className="mr-2 font-bold text-slate-400 lg:hidden">분류</span>{item.categoryName}</p>
                 <div className="min-w-0">
                   {item.canManage && editAction ? (
-                    <button className="max-w-full truncate rounded-lg text-left text-sm font-black text-slate-900 outline-none hover:text-emerald-700 focus-visible:ring-2 focus-visible:ring-emerald-500" onClick={() => void editAction(item.id)} type="button">
+                    <button aria-busy={editingId === item.id} className="max-w-full truncate rounded-lg text-left text-sm font-black text-slate-900 outline-none hover:text-emerald-700 focus-visible:ring-2 focus-visible:ring-emerald-500 disabled:cursor-wait disabled:opacity-60" disabled={editingId !== null} onClick={() => void handleEdit(item.id)} type="button">
                       <span className="sr-only">{item.description} 편집</span><span aria-hidden="true">{item.description}</span>
                     </button>
                   ) : <p className="truncate text-sm font-black text-slate-900">{item.description}</p>}
@@ -80,6 +100,7 @@ export function ContributionList({
 
       {hasNext ? <div aria-hidden="true" className="h-2" ref={sentinelRef} /> : null}
       {loading ? <p aria-live="polite" className="py-4 text-center text-sm text-slate-500">납입 내역을 불러오는 중...</p> : null}
+      {editError ? <p className="py-4 text-center text-sm font-semibold text-rose-600" role="alert">{editError}</p> : null}
       {error ? (
         <div className="py-4 text-center">
           <p className="text-sm font-semibold text-rose-600" role="alert">{error}</p>
