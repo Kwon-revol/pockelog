@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { TransactionForm, type TransactionFormAction } from "@/features/transactions/transaction-form";
 import { TransactionList } from "@/features/transactions/transaction-list";
@@ -32,8 +32,6 @@ export function LedgerScreen({ initialData, createAction, updateAction, trashAct
   );
   const [summary, setSummary] = useState(initialData.summary);
   const pages = useTransactionPages(initialData.page, initialData.filters, loadPage);
-
-  useEffect(() => setSummary(initialData.summary), [initialData.summary]);
 
   const moveSelectedToTrash = async (item: TransactionListItem) => {
     const result = await trashAction(item.id);
