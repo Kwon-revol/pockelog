@@ -2,10 +2,8 @@ import { act, cleanup, render, screen, waitFor, within } from "@testing-library/
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
-import {
-  getLedgerScreenKey,
-  LedgerScreen,
-} from "@/features/transactions/ledger-screen";
+import { LedgerScreen } from "@/features/transactions/ledger-screen";
+import { getLedgerScreenKey } from "@/features/transactions/ledger-screen-key";
 import type {
   LedgerPageData,
   TransactionActionState,

@@ -6,10 +6,8 @@ import {
   trashTransactionAction,
   updateTransactionAction,
 } from "@/features/transactions/actions";
-import {
-  getLedgerScreenKey,
-  LedgerScreen,
-} from "@/features/transactions/ledger-screen";
+import { LedgerScreen } from "@/features/transactions/ledger-screen";
+import { getLedgerScreenKey } from "@/features/transactions/ledger-screen-key";
 import {
   getLedgerPageData,
   TransactionAuthenticationError,
