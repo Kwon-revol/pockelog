@@ -13,7 +13,10 @@ export function encodeTrashCursor(cursor: TrashCursor) {
 
 export function decodeTrashCursor(value: string): TrashCursor | null {
   try {
-    const parsed = JSON.parse(Buffer.from(value, "base64url").toString("utf8"));
+    if (!/^[A-Za-z0-9_-]+$/.test(value)) return null;
+    const decoded = Buffer.from(value, "base64url");
+    if (decoded.toString("base64url") !== value) return null;
+    const parsed = JSON.parse(decoded.toString("utf8"));
     const result = cursorSchema.safeParse(parsed);
     return result.success ? result.data : null;
   } catch {

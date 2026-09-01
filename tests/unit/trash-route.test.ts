@@ -43,6 +43,19 @@ describe("trash page route", () => {
     expect(mocks.getTrashPageForCurrentUser).not.toHaveBeenCalled();
   });
 
+  it("returns 400 when a valid cursor has a non-base64url suffix", async () => {
+    const cursor = encodeTrashCursor({
+      deletedAt: "2026-08-31T01:02:03.000Z",
+      id: "11111111-1111-4111-8111-111111111111",
+    });
+
+    const response = await GET(request(`cursor=${cursor}!!!`));
+
+    expect(response.status).toBe(400);
+    await expect(response.json()).resolves.toEqual({ message: "잘못된 조회 요청입니다." });
+    expect(mocks.getTrashPageForCurrentUser).not.toHaveBeenCalled();
+  });
+
   it("returns a trash page for a valid cursor", async () => {
     const cursor = encodeTrashCursor({
       deletedAt: "2026-08-31T01:02:03.000Z",

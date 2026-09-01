@@ -36,6 +36,19 @@ describe("trash server actions", () => {
   });
 
   it.each([
+    [restoreDeletedTransactionAction, "복원하지 못했습니다. 다시 시도해 주세요."],
+    [
+      permanentlyDeleteTransactionAction,
+      "영구 삭제하지 못했습니다. 다시 시도해 주세요.",
+    ],
+  ] as const)("maps gateway initialization failure to a safe action state", async (action, message) => {
+    mocks.createSupabaseTrashGateway.mockRejectedValue(new Error("secret client failure"));
+
+    await expect(action(transactionId)).resolves.toEqual({ status: "error", message });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
+
+  it.each([
     [restoreDeletedTransactionAction, "restored", "내역을 복원했어요."],
     [permanentlyDeleteTransactionAction, "deleted", "내역을 영구 삭제했어요."],
   ] as const)("revalidates every consumer after a successful mutation", async (action, result, message) => {
