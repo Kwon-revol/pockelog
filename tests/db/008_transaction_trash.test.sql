@@ -200,6 +200,19 @@ select throws_ok(
   $$select * from public.get_deleted_transactions('82000000-0000-4000-8000-000000000001', null, null, 50)$$,
   '42501', 'ledger owner required', '외부 사용자는 휴지통을 조회할 수 없다'
 );
+select is(
+  (
+    select count(*)::integer
+    from public.get_deleted_transactions(
+      (select id from public.ledgers where owner_id = auth.uid() and kind = 'personal'),
+      null,
+      null,
+      50
+    )
+  ),
+  1,
+  '개인 장부 소유자는 자신의 삭제 거래를 조회할 수 있다'
+);
 
 select set_config('request.jwt.claim.sub', '81000000-0000-4000-8000-000000000001', true);
 select is(
