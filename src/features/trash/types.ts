@@ -13,5 +13,15 @@ export type TrashItem = {
 };
 
 export type TrashPage = { items: TrashItem[]; nextCursor: string | null };
-export type TrashMutationResult = "restored" | "deleted" | "missing" | "forbidden" | "error";
-export type TrashActionState = { status: "success" | "error"; message: string };
+export const TRASH_LOGIN_PATH = "/login?next=%2Fsettings%2Ftrash";
+export type TrashMutationResult =
+  | "restored"
+  | "deleted"
+  | "missing"
+  | "unauthenticated"
+  | "forbidden"
+  | "error";
+export type TrashActionState = {
+  status: "success" | "error" | "unauthenticated";
+  message: string;
+};

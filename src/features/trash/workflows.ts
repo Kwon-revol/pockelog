@@ -19,6 +19,9 @@ export async function restoreDeletedTransaction(
     if (result === "restored") {
       return { status: "success", message: "내역을 복원했어요." };
     }
+    if (result === "unauthenticated") {
+      return { status: "unauthenticated", message: "로그인이 필요합니다." };
+    }
     return {
       status: "error",
       message: result === "error"
@@ -38,6 +41,9 @@ export async function permanentlyDeleteTransaction(
     const result = await gateway.permanentlyDelete(id);
     if (result === "deleted") {
       return { status: "success", message: "내역을 영구 삭제했어요." };
+    }
+    if (result === "unauthenticated") {
+      return { status: "unauthenticated", message: "로그인이 필요합니다." };
     }
     return {
       status: "error",

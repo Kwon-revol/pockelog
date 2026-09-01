@@ -1,9 +1,15 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useState } from "react";
 
-import type { TrashActionState, TrashItem, TrashPage } from "@/features/trash/types";
+import {
+  TRASH_LOGIN_PATH,
+  type TrashActionState,
+  type TrashItem,
+  type TrashPage,
+} from "@/features/trash/types";
 import type { LoadTrashPage } from "@/features/trash/use-trash-pages";
 import { useTrashPages } from "@/features/trash/use-trash-pages";
 
@@ -101,6 +107,7 @@ export function TrashScreen({
   permanentlyDeleteAction,
   loadPage,
 }: TrashScreenProps) {
+  const router = useRouter();
   const {
     accessRevoked,
     hasNext,
@@ -132,6 +139,7 @@ export function TrashScreen({
     try {
       const result = await (restore ? restoreAction(item.id) : permanentlyDeleteAction(item.id));
       if (result.status === "success") removeItem(item.id);
+      else if (result.status === "unauthenticated") router.push(TRASH_LOGIN_PATH);
       else setActionErrors((current) => ({ ...current, [item.id]: result.message }));
     } catch {
       setActionErrors((current) => ({

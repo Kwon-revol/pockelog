@@ -39,6 +39,15 @@ describe("trash mutation workflows", () => {
     });
   });
 
+  it.each([
+    [restoreDeletedTransaction],
+    [permanentlyDeleteTransaction],
+  ])("preserves an unauthenticated mutation result for client navigation", async (mutate) => {
+    await expect(
+      mutate(transactionId, gateway("unauthenticated" as TrashMutationResult)),
+    ).resolves.toEqual({ status: "unauthenticated", message: "로그인이 필요합니다." });
+  });
+
   it("maps permanent deletion success, hidden targets, and system failures", async () => {
     await expect(
       permanentlyDeleteTransaction(transactionId, gateway("deleted")),

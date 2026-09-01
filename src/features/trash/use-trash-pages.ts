@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 
-import type { TrashPage } from "@/features/trash/types";
+import { TRASH_LOGIN_PATH, type TrashPage } from "@/features/trash/types";
 
 export type LoadTrashPage = (cursor: string) => Promise<TrashPage>;
 
@@ -24,6 +24,7 @@ export function useTrashPages(
   loadPage: LoadTrashPage = fetchTrashPage,
 ) {
   const router = useRouter();
+  const refreshRoute = router.refresh;
   const [items, setItems] = useState(initialPage.items);
   const [nextCursor, setNextCursor] = useState(initialPage.nextCursor);
   const [loading, setLoading] = useState(false);
@@ -66,7 +67,7 @@ export function useTrashPages(
     } catch (error) {
       if (error instanceof SessionExpiredError) {
         setNextCursor(null);
-        router.push("/login?next=%2Fsettings%2Ftrash");
+        router.push(TRASH_LOGIN_PATH);
       } else if (error instanceof TrashAccessRevokedError) {
         setItems([]);
         setNextCursor(null);
@@ -79,6 +80,18 @@ export function useTrashPages(
       setLoading(false);
     }
   }, [accessRevoked, loadPage, nextCursor, router]);
+
+  useEffect(() => {
+    let wasVisible = document.visibilityState === "visible";
+    const refreshWhenVisible = () => {
+      const isVisible = document.visibilityState === "visible";
+      if (isVisible && !wasVisible) refreshRoute();
+      wasVisible = isVisible;
+    };
+
+    document.addEventListener("visibilitychange", refreshWhenVisible);
+    return () => document.removeEventListener("visibilitychange", refreshWhenVisible);
+  }, [refreshRoute]);
 
   useEffect(() => {
     const node = sentinelRef.current;

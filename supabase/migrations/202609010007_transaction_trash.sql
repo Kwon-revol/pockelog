@@ -1,3 +1,7 @@
+create index if not exists transactions_deleted_ledger_order_index
+  on public.transactions (ledger_id, deleted_at desc, id desc)
+  where deleted_at is not null;
+
 create or replace function public.get_deleted_transactions(
   target_ledger_id uuid,
   cursor_deleted_at timestamptz default null,
@@ -73,7 +77,7 @@ declare
   owned_transaction_id uuid;
 begin
   if auth.uid() is null then
-    return 'missing';
+    raise exception using errcode = '28000', message = 'authentication required';
   end if;
 
   select transaction_row.id into owned_transaction_id
@@ -109,7 +113,7 @@ declare
   owned_transaction_id uuid;
 begin
   if auth.uid() is null then
-    return 'missing';
+    raise exception using errcode = '28000', message = 'authentication required';
   end if;
 
   select transaction_row.id into owned_transaction_id

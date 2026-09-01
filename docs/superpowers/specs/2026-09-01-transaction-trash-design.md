@@ -71,10 +71,12 @@
 - `permanently_delete_transaction(target_transaction_id)`는 소유한 장부의 삭제 거래만 영구 삭제한다.
 - 두 함수는 대상 행을 `for update`로 잠가 동시 복원·삭제를 직렬화한다.
 - 결과는 `restored`, `deleted`, `missing` 중 하나로 반환하고 권한 오류는 PostgreSQL `42501`을 사용한다.
+- 인증 세션이 없으면 `missing`으로 숨기지 않고 PostgreSQL `28000`을 반환해 서버가 로그인 이동을 구분한다. 인증된 사용자의 활성·없는·다른 장부 거래는 모두 동일한 `missing`을 반환한다.
 
 ### 5.3 권한과 안전성
 
 - 함수의 `search_path`는 빈 값으로 고정하고 모든 객체를 완전 수식한다.
+- 휴지통 정렬 조회는 `(ledger_id, deleted_at desc, id desc) where deleted_at is not null` 부분 인덱스를 사용하며 마이그레이션 재실행에도 안전하다.
 - `PUBLIC`, `anon` 실행 권한을 명시적으로 제거하고 `authenticated`에만 실행 권한을 부여한다.
 - 일반 사용자의 `transactions` 테이블 직접 `delete` 권한은 계속 부여하지 않는다.
 - 마이그레이션은 함수와 권한을 `create or replace`, `revoke`, `grant`로 선언해 재실행해도 같은 상태가 되게 한다.

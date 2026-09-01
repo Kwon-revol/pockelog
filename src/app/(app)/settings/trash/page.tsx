@@ -15,6 +15,7 @@ import {
   TrashUnavailableError,
 } from "@/features/trash/queries";
 import { TrashAccessNotice, TrashScreen } from "@/features/trash/trash-screen";
+import { TRASH_LOGIN_PATH } from "@/features/trash/types";
 
 export const metadata: Metadata = { title: "휴지통" };
 
@@ -34,7 +35,7 @@ export default async function TrashPage() {
     initialPage = await getTrashPageForCurrentUser();
   } catch (error) {
     if (error instanceof TrashAuthenticationError) {
-      redirect("/login?next=%2Fsettings%2Ftrash");
+      redirect(TRASH_LOGIN_PATH);
     }
     if (error instanceof TrashAuthorizationError) return <TrashAccessNotice />;
     if (error instanceof TrashUnavailableError) {
@@ -47,7 +48,7 @@ export default async function TrashPage() {
   }
 
   const context = await getCurrentAppContext();
-  if (!context) redirect("/login?next=%2Fsettings%2Ftrash");
+  if (!context) redirect(TRASH_LOGIN_PATH);
 
   return (
     <TrashScreen

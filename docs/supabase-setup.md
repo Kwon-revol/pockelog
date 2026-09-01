@@ -154,13 +154,16 @@ select
     as anon_cannot_list_trash,
   not has_table_privilege('authenticated', 'public.transactions', 'delete')
     as authenticated_cannot_directly_delete_transactions,
+  to_regclass('public.transactions_deleted_ledger_order_index') is not null
+    as trash_listing_index_exists,
   (select relrowsecurity from pg_class where oid = 'public.transactions'::regclass)
     as transactions_rls_enabled;
 ```
 
 휴지통 RPC는 개인 장부와 공동 장부 모두 소유자만 사용할 수 있다. 일반 구성원과 관계없는
 사용자가 삭제 거래의 존재를 알아낼 수 없도록 복원·영구 삭제는 권한이 없거나 대상이 없을 때
-같은 `missing` 결과를 반환한다. SQL Editor에서 마이그레이션 적용 후 소유자 계정으로 조회·복원을,
+같은 `missing` 결과를 반환한다. 인증 세션이 없을 때만 별도의 `28000` 계약으로 로그인 이동을
+요청한다. SQL Editor에서 마이그레이션 적용 후 소유자 계정으로 조회·복원을,
 일반 구성원 계정으로 조회 거부를 각각 확인한 다음 애플리케이션 코드를 배포한다.
 삭제된 거래는 장부 소유자가 복원하거나 영구 삭제할 때까지 기간 제한 없이 보관된다. 자동 만료나
 자동 영구 삭제는 제공하지 않는다.

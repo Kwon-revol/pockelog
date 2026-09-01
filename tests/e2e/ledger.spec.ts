@@ -15,12 +15,21 @@ async function openAddPanel(page: Page, testInfo: TestInfo) {
   return page.getByRole("dialog", { name: "내역 추가" });
 }
 
+function visibleLedgerDescription(page: Page, testInfo: TestInfo, description: string | RegExp) {
+  const transactions = page.getByRole("region", { name: "거래 내역" });
+  return testInfo.project.name === "mobile-chromium"
+    ? transactions.locator(".lg\\:hidden").getByText(description, { exact: typeof description === "string" })
+    : transactions.getByRole("table").getByText(description, { exact: typeof description === "string" });
+}
+
+function visibleTrashDescription(page: Page, testInfo: TestInfo, description: string) {
+  return testInfo.project.name === "mobile-chromium"
+    ? page.getByRole("region", { name: "휴지통 내역" }).getByText(description, { exact: true })
+    : page.getByRole("table", { name: "휴지통 내역" }).getByText(description, { exact: true });
+}
+
 async function openTransaction(page: Page, testInfo: TestInfo, description: string) {
-  if (testInfo.project.name === "mobile-chromium") {
-    await page.locator("button").filter({ hasText: description }).click();
-  } else {
-    await page.getByRole("cell", { name: description }).click();
-  }
+  await visibleLedgerDescription(page, testInfo, description).click();
   return page.getByRole("dialog", { name: "내역 수정" });
 }
 
@@ -79,7 +88,7 @@ test.describe("호스팅된 개발 Supabase 거래 가계부", () => {
     await dialog.getByLabel("내용").fill("팀 점심");
     await dialog.getByRole("button", { name: "수정 저장" }).click();
     await expect(dialog).toBeHidden();
-    await expect(page.getByText("팀 점심").first()).toBeVisible();
+    await expect(visibleLedgerDescription(page, testInfo, "팀 점심")).toBeVisible();
 
     dialog = await openTransaction(page, testInfo, "팀 점심");
     page.once("dialog", (confirmation) => confirmation.accept());
@@ -93,33 +102,33 @@ test.describe("호스팅된 개발 Supabase 거래 가계부", () => {
     await dialog.getByLabel("금액").fill("100");
     await dialog.getByRole("button", { name: "저장" }).click();
     await expect(dialog).toBeHidden();
-    await expect(page.getByText("휴지통 검증").first()).toBeVisible();
+    await expect(visibleLedgerDescription(page, testInfo, "휴지통 검증")).toBeVisible();
 
     dialog = await openTransaction(page, testInfo, "휴지통 검증");
     page.once("dialog", (confirmation) => confirmation.accept());
     await dialog.getByRole("button", { name: "삭제" }).click();
     await expect(dialog).toBeHidden();
     await page.goto("/settings/trash");
-    await expect(page.getByText("휴지통 검증").first()).toBeVisible();
+    await expect(visibleTrashDescription(page, testInfo, "휴지통 검증")).toBeVisible();
 
     page.once("dialog", (confirmation) => confirmation.accept());
     await page.getByRole("button", { name: "휴지통 검증 복원" }).click();
-    await expect(page.getByText("휴지통 검증")).toHaveCount(0);
+    await expect(visibleTrashDescription(page, testInfo, "휴지통 검증")).toHaveCount(0);
     await page.goto("/ledger");
-    await expect(page.getByText("휴지통 검증").first()).toBeVisible();
+    await expect(visibleLedgerDescription(page, testInfo, "휴지통 검증")).toBeVisible();
 
     dialog = await openTransaction(page, testInfo, "휴지통 검증");
     page.once("dialog", (confirmation) => confirmation.accept());
     await dialog.getByRole("button", { name: "삭제" }).click();
     await expect(dialog).toBeHidden();
     await page.goto("/settings/trash");
-    await expect(page.getByText("휴지통 검증").first()).toBeVisible();
+    await expect(visibleTrashDescription(page, testInfo, "휴지통 검증")).toBeVisible();
 
     page.once("dialog", (confirmation) => confirmation.accept());
     await page.getByRole("button", { name: "휴지통 검증 영구 삭제" }).click();
-    await expect(page.getByText("휴지통 검증")).toHaveCount(0);
+    await expect(visibleTrashDescription(page, testInfo, "휴지통 검증")).toHaveCount(0);
     await page.goto("/ledger");
-    await expect(page.getByText("휴지통 검증")).toHaveCount(0);
+    await expect(visibleLedgerDescription(page, testInfo, "휴지통 검증")).toHaveCount(0);
 
     if (testInfo.project.name === "desktop-chromium") {
       for (let index = 1; index <= 51; index += 1) {
@@ -131,10 +140,10 @@ test.describe("호스팅된 개발 Supabase 거래 가계부", () => {
         await expect(dialog).toBeHidden();
       }
 
-      const generatedItems = page.getByText(/^자동 내역 \d+$/);
-      await expect(generatedItems).toHaveCount(100);
+      const generatedItems = visibleLedgerDescription(page, testInfo, /^자동 내역 \d+$/);
+      await expect(generatedItems).toHaveCount(50);
       await page.getByTestId("transaction-sentinel").scrollIntoViewIfNeeded();
-      await expect(generatedItems).toHaveCount(102, { timeout: 15_000 });
+      await expect(generatedItems).toHaveCount(51, { timeout: 15_000 });
       await expect(page.getByText("모든 내역을 확인했어요")).toHaveCount(0);
     }
   });

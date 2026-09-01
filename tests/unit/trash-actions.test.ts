@@ -75,4 +75,20 @@ describe("trash server actions", () => {
     });
     expect(mocks.revalidatePath).not.toHaveBeenCalled();
   });
+
+  it.each([
+    [restoreDeletedTransactionAction],
+    [permanentlyDeleteTransactionAction],
+  ])("returns a machine-readable unauthenticated state without revalidation", async (action) => {
+    mocks.createSupabaseTrashGateway.mockResolvedValue({
+      restore: vi.fn().mockResolvedValue("unauthenticated"),
+      permanentlyDelete: vi.fn().mockResolvedValue("unauthenticated"),
+    });
+
+    await expect(action(transactionId)).resolves.toEqual({
+      status: "unauthenticated",
+      message: "로그인이 필요합니다.",
+    });
+    expect(mocks.revalidatePath).not.toHaveBeenCalled();
+  });
 });

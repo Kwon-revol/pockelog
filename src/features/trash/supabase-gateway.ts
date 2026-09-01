@@ -14,8 +14,14 @@ async function runMutation(
   successResult: "restored" | "deleted",
 ): Promise<TrashMutationResult> {
   try {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return "unauthenticated";
+
     const { data, error } = await supabase.rpc(rpcName, { target_transaction_id: id });
-    if (error) return error.code === "42501" ? "forbidden" : "error";
+    if (error) {
+      if (error.code === "28000") return "unauthenticated";
+      return error.code === "42501" ? "forbidden" : "error";
+    }
     if (data === successResult || data === "missing") return data;
     return "error";
   } catch {

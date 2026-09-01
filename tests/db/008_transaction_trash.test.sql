@@ -2,7 +2,7 @@ begin;
 set local search_path = public, extensions;
 
 create extension if not exists pgtap with schema extensions;
-select plan(24);
+select plan(28);
 
 insert into auth.users (
   id, instance_id, aud, role, email, encrypted_password, email_confirmed_at,
@@ -114,7 +114,8 @@ set
     when '84000000-0000-4000-8000-000000000002'::uuid then '2026-09-01 01:00:00+00'::timestamptz
     when '84000000-0000-4000-8000-000000000003'::uuid then '2026-08-31 01:00:00+00'::timestamptz
     when '84000000-0000-4000-8000-000000000004'::uuid then '2026-08-30 01:00:00+00'::timestamptz
-    else '2026-08-01 01:00:00+00'::timestamptz - (right(id::text, 2)::integer * interval '1 minute')
+    else '2026-08-01 01:00:00+00'::timestamptz
+      - (least(right(id::text, 2)::integer, 51) * interval '1 minute')
   end,
   deleted_by = auth.uid()
 where ledger_id = '82000000-0000-4000-8000-000000000001'
@@ -178,9 +179,28 @@ select ok(
   not has_table_privilege('authenticated', 'public.transactions', 'delete'),
   '로그인 사용자에게 거래 직접 삭제 권한이 없다'
 );
+select is(
+  (
+    select pg_get_indexdef(index_class.oid)
+    from pg_catalog.pg_class as index_class
+    where index_class.relnamespace = 'public'::regnamespace
+      and index_class.relname = 'transactions_deleted_ledger_order_index'
+  ),
+  'CREATE INDEX transactions_deleted_ledger_order_index ON public.transactions USING btree (ledger_id, deleted_at DESC, id DESC) WHERE (deleted_at IS NOT NULL)',
+  '휴지통 목록은 삭제 거래 전용 장부·커서 정렬 인덱스를 사용한다'
+);
 
 set local role authenticated;
 select set_config('request.jwt.claim.role', 'authenticated', true);
+select set_config('request.jwt.claim.sub', '', true);
+select throws_ok(
+  $$select public.restore_deleted_transaction('84000000-0000-4000-8000-000000000002')$$,
+  '28000', 'authentication required', '세션이 없으면 복원 함수가 인증 필요를 구분한다'
+);
+select throws_ok(
+  $$select public.permanently_delete_transaction('84000000-0000-4000-8000-000000000003')$$,
+  '28000', 'authentication required', '세션이 없으면 영구 삭제 함수가 인증 필요를 구분한다'
+);
 select set_config('request.jwt.claim.sub', '81000000-0000-4000-8000-000000000002', true);
 select throws_ok(
   $$select * from public.get_deleted_transactions('82000000-0000-4000-8000-000000000001', null, null, 50)$$,
@@ -226,8 +246,11 @@ select is(
     '84000000-0000-4000-8000-000000000004'::uuid
   ] || (
     select array_agg(('84000000-0000-4000-8000-' || lpad(series::text, 12, '0'))::uuid order by series)
-    from generate_series(5, 52) as series
-  ),
+    from generate_series(5, 50) as series
+  ) || array[
+    '84000000-0000-4000-8000-000000000052'::uuid,
+    '84000000-0000-4000-8000-000000000051'::uuid
+  ],
   '소유자는 삭제 거래만 삭제 시각 최신순으로 보고 활성 거래를 제외한다'
 );
 select is(
@@ -237,6 +260,66 @@ select is(
   ),
   51,
   '휴지통 조회는 다음 페이지 확인용 51번째 sentinel 행을 반환한다'
+);
+select ok(
+  (
+    with first_page as materialized (
+      select *
+      from public.get_deleted_transactions(
+        '82000000-0000-4000-8000-000000000001', null, null, 50
+      )
+      order by deleted_at desc, id desc
+      limit 50
+    ), boundary as (
+      select deleted_at, id
+      from first_page
+      order by deleted_at desc, id desc
+      offset 49 limit 1
+    ), second_page as materialized (
+      select page.*
+      from boundary
+      cross join lateral public.get_deleted_transactions(
+        '82000000-0000-4000-8000-000000000001',
+        boundary.deleted_at,
+        boundary.id,
+        50
+      ) as page
+      order by page.deleted_at desc, page.id desc
+    ), combined as (
+      select 1 as page_number, first_page.* from first_page
+      union all
+      select 2 as page_number, second_page.* from second_page
+    )
+    select
+      (select count(*) from first_page) = 50
+      and (select array_agg(id order by deleted_at desc, id desc) from second_page)
+        = array['84000000-0000-4000-8000-000000000051'::uuid]
+      and (select id from boundary) = '84000000-0000-4000-8000-000000000052'::uuid
+      and (select deleted_at from boundary) = (select deleted_at from second_page limit 1)
+      and not exists (
+        select 1 from first_page join second_page using (id)
+      )
+      and (select count(*) from combined) = 51
+      and (select count(distinct id) from combined) = 51
+      and (
+        select array_agg(id order by page_number, deleted_at desc, id desc)
+        from combined
+      ) = array[
+        '84000000-0000-4000-8000-000000000002'::uuid,
+        '84000000-0000-4000-8000-000000000003'::uuid,
+        '84000000-0000-4000-8000-000000000004'::uuid
+      ] || (
+        select array_agg(
+          ('84000000-0000-4000-8000-' || lpad(series::text, 12, '0'))::uuid
+          order by series
+        )
+        from generate_series(5, 50) as series
+      ) || array[
+        '84000000-0000-4000-8000-000000000052'::uuid,
+        '84000000-0000-4000-8000-000000000051'::uuid
+      ]
+  ),
+  '같은 삭제 시각이 50건 경계를 넘어도 두 페이지는 중복·누락 없이 전체 정렬을 유지한다'
 );
 select is(
   public.restore_deleted_transaction('84000000-0000-4000-8000-000000000002'),
@@ -278,11 +361,15 @@ select is(
 );
 select is(
   array[
+    public.restore_deleted_transaction('84000000-0000-4000-8000-000000000001'),
+    public.permanently_delete_transaction('84000000-0000-4000-8000-000000000001'),
+    public.restore_deleted_transaction('84000000-0000-4000-8000-000000000054'),
+    public.permanently_delete_transaction('84000000-0000-4000-8000-000000000054'),
     public.restore_deleted_transaction('84000000-0000-4000-8000-000000000053'),
     public.permanently_delete_transaction('84000000-0000-4000-8000-000000000053')
   ],
-  array['missing', 'missing']::text[],
-  '다른 장부의 삭제 거래는 복원과 영구 삭제 모두 missing으로 숨긴다'
+  array['missing', 'missing', 'missing', 'missing', 'missing', 'missing']::text[],
+  '활성·없는·다른 장부 거래는 복원과 영구 삭제 모두 같은 missing으로 숨긴다'
 );
 
 reset role;

@@ -6,7 +6,7 @@ import TrashPage from "@/app/(app)/settings/trash/page";
 import { TrashScreen } from "@/features/trash/trash-screen";
 import type { TrashActionState, TrashItem, TrashPage as TrashPageData } from "@/features/trash/types";
 
-const navigation = vi.hoisted(() => ({ push: vi.fn(), redirect: vi.fn() }));
+const navigation = vi.hoisted(() => ({ push: vi.fn(), redirect: vi.fn(), refresh: vi.fn() }));
 const queryMocks = vi.hoisted(() => {
   class TrashAuthenticationError extends Error {}
   class TrashAuthorizationError extends Error {}
@@ -24,7 +24,7 @@ const queryMocks = vi.hoisted(() => {
 
 vi.mock("next/navigation", () => ({
   redirect: navigation.redirect,
-  useRouter: () => ({ push: navigation.push }),
+  useRouter: () => ({ push: navigation.push, refresh: navigation.refresh }),
 }));
 
 vi.mock("@/features/ledgers/queries", () => ({
@@ -97,6 +97,7 @@ describe("TrashScreen", () => {
   beforeEach(() => {
     observerCallback = null;
     navigation.push.mockReset();
+    navigation.refresh.mockReset();
     vi.stubGlobal("IntersectionObserver", FakeIntersectionObserver);
     vi.stubGlobal("confirm", vi.fn(() => true));
   });
@@ -104,6 +105,7 @@ describe("TrashScreen", () => {
   afterEach(() => {
     cleanup();
     vi.unstubAllGlobals();
+    vi.restoreAllMocks();
   });
 
   it("shows the same transaction details in mobile cards and the desktop table", () => {
@@ -179,6 +181,26 @@ describe("TrashScreen", () => {
 
     expect((await screen.findAllByRole("alert"))[0]).toHaveTextContent("복원하지 못했습니다. 다시 시도해 주세요.");
     expect(screen.queryByText("database details")).not.toBeInTheDocument();
+  });
+
+  it.each([
+    ["복원", "restoreAction"],
+    ["영구 삭제", "permanentlyDeleteAction"],
+  ] as const)("takes an expired %s mutation session to login", async (label, actionName) => {
+    const user = userEvent.setup();
+    const expiredAction = async () => ({
+      status: "unauthenticated",
+      message: "로그인이 필요합니다.",
+    } as unknown as TrashActionState);
+    renderScreen({ [actionName]: expiredAction });
+
+    await user.click(screen.getAllByRole("button", { name: `팀 점심 ${label}` })[0]);
+
+    await waitFor(() => {
+      expect(navigation.push).toHaveBeenCalledWith("/login?next=%2Fsettings%2Ftrash");
+    });
+    expect(screen.getAllByText("팀 점심")).toHaveLength(2);
+    expect(screen.queryByRole("alert")).not.toBeInTheDocument();
   });
 
   it("locks both actions for an item while it is pending", async () => {
@@ -263,6 +285,37 @@ describe("TrashScreen", () => {
 
     expect(fetchPage).toHaveBeenCalledTimes(1);
     expect(navigation.push).toHaveBeenCalledTimes(1);
+  });
+
+  it("refreshes once when the tab becomes visible and removes its single listener", () => {
+    const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    const addEventListener = vi.spyOn(document, "addEventListener");
+    const removeEventListener = vi.spyOn(document, "removeEventListener");
+    const view = renderScreen();
+
+    act(() => document.dispatchEvent(new Event("visibilitychange")));
+    expect(navigation.refresh).not.toHaveBeenCalled();
+
+    visibility.mockReturnValue("visible");
+    act(() => document.dispatchEvent(new Event("visibilitychange")));
+    expect(navigation.refresh).toHaveBeenCalledOnce();
+    act(() => document.dispatchEvent(new Event("visibilitychange")));
+    expect(navigation.refresh).toHaveBeenCalledOnce();
+
+    view.rerender(
+      <TrashScreen
+        initialPage={initialPage}
+        ledgerName="우리 집"
+        permanentlyDeleteAction={successAction}
+        restoreAction={successAction}
+      />,
+    );
+    expect(addEventListener.mock.calls.filter(([event]) => event === "visibilitychange")).toHaveLength(1);
+
+    view.unmount();
+    expect(removeEventListener.mock.calls.filter(([event]) => event === "visibilitychange")).toHaveLength(1);
+    act(() => document.dispatchEvent(new Event("visibilitychange")));
+    expect(navigation.refresh).toHaveBeenCalledOnce();
   });
 });
 
