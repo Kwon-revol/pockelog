@@ -78,6 +78,7 @@ function renderScreen(overrides: Partial<React.ComponentProps<typeof TrashScreen
       initialPage={initialPage}
       ledgerName="우리 집"
       permanentlyDeleteAction={successAction}
+      serverRevision="revision-1"
       restoreAction={successAction}
       {...overrides}
     />,
@@ -307,6 +308,7 @@ describe("TrashScreen", () => {
         initialPage={initialPage}
         ledgerName="우리 집"
         permanentlyDeleteAction={successAction}
+        serverRevision="revision-1"
         restoreAction={successAction}
       />,
     );
@@ -314,6 +316,52 @@ describe("TrashScreen", () => {
 
     view.unmount();
     expect(removeEventListener.mock.calls.filter(([event]) => event === "visibilitychange")).toHaveLength(1);
+    act(() => document.dispatchEvent(new Event("visibilitychange")));
+    expect(navigation.refresh).toHaveBeenCalledOnce();
+  });
+
+  it("drops loaded later pages when a visibility refresh returns the same first page", async () => {
+    const visibility = vi.spyOn(document, "visibilityState", "get").mockReturnValue("hidden");
+    const laterItem = {
+      ...firstItem,
+      id: "22222222-2222-4222-8222-222222222222",
+      description: "다른 탭에서 복원된 내역",
+    };
+    const unchangedFirstPage = { ...initialPage, nextCursor: "cursor-1" };
+    const fetchPage = vi.fn().mockResolvedValue(new Response(
+      JSON.stringify({ items: [laterItem], nextCursor: null }),
+      { status: 200, headers: { "Content-Type": "application/json" } },
+    ));
+    vi.stubGlobal("fetch", fetchPage);
+    queryMocks.getTrashPageForCurrentUser.mockResolvedValue(unchangedFirstPage);
+    queryMocks.getCurrentAppContext.mockResolvedValue({
+      currentLedger: { id: "ledger-1", name: "우리 집", kind: "personal", role: "owner" },
+      ledgers: [],
+      needsDefaultRepair: false,
+      pendingInvitationCount: 0,
+      userId: "user-1",
+      userName: "권혁",
+    });
+    const firstServerRender = await TrashPage();
+    const refreshedServerRender = await TrashPage();
+    const view = render(firstServerRender);
+
+    await enterSentinel();
+    expect(await screen.findAllByText("다른 탭에서 복원된 내역")).toHaveLength(2);
+
+    visibility.mockReturnValue("visible");
+    act(() => document.dispatchEvent(new Event("visibilitychange")));
+    expect(navigation.refresh).toHaveBeenCalledOnce();
+
+    view.rerender(refreshedServerRender);
+
+    await waitFor(() => {
+      expect(screen.queryByText("다른 탭에서 복원된 내역")).not.toBeInTheDocument();
+    });
+    expect(screen.getAllByText("팀 점심")).toHaveLength(2);
+    expect(screen.getByTestId("trash-sentinel")).toBeInTheDocument();
+    expect(fetchPage).toHaveBeenCalledTimes(1);
+
     act(() => document.dispatchEvent(new Event("visibilitychange")));
     expect(navigation.refresh).toHaveBeenCalledOnce();
   });

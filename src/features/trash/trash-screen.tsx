@@ -35,8 +35,11 @@ export type TrashScreenProps = {
   initialPage: TrashPage;
   restoreAction: (id: string) => Promise<TrashActionState>;
   permanentlyDeleteAction: (id: string) => Promise<TrashActionState>;
+  serverRevision: string;
   loadPage?: LoadTrashPage;
 };
+
+type TrashScreenContentProps = Omit<TrashScreenProps, "serverRevision">;
 
 type ActionKind = "restore" | "permanentlyDelete";
 
@@ -100,13 +103,13 @@ export function TrashAccessNotice() {
   );
 }
 
-export function TrashScreen({
+function TrashScreenContent({
   ledgerName,
   initialPage,
   restoreAction,
   permanentlyDeleteAction,
   loadPage,
-}: TrashScreenProps) {
+}: TrashScreenContentProps) {
   const router = useRouter();
   const {
     accessRevoked,
@@ -225,4 +228,8 @@ export function TrashScreen({
       ) : null}
     </div>
   );
+}
+
+export function TrashScreen({ serverRevision, ...props }: TrashScreenProps) {
+  return <TrashScreenContent key={serverRevision} {...props} />;
 }

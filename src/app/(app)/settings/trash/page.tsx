@@ -53,10 +53,10 @@ export default async function TrashPage() {
   return (
     <TrashScreen
       initialPage={initialPage}
-      key={JSON.stringify({ ledgerId: context.currentLedger.id, initialPage })}
       ledgerName={context.currentLedger.name}
       permanentlyDeleteAction={permanentlyDeleteTransactionAction}
       restoreAction={restoreDeletedTransactionAction}
+      serverRevision={crypto.randomUUID()}
     />
   );
 }
