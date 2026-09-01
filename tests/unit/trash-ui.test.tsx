@@ -251,13 +251,18 @@ describe("TrashScreen", () => {
     expect(screen.getByRole("link", { name: "설정으로 돌아가기" })).toHaveAttribute("href", "/settings");
   });
 
-  it("redirects to login when the session expires during pagination", async () => {
-    vi.stubGlobal("fetch", vi.fn().mockResolvedValue(new Response(null, { status: 401 })));
+  it("stops pagination after the session expires while the sentinel stays visible", async () => {
+    const fetchPage = vi.fn().mockResolvedValue(new Response(null, { status: 401 }));
+    vi.stubGlobal("fetch", fetchPage);
     renderScreen({ initialPage: { ...initialPage, nextCursor: "cursor-1" } });
 
     await enterSentinel();
-
     await waitFor(() => expect(navigation.push).toHaveBeenCalledWith("/login?next=%2Fsettings%2Ftrash"));
+
+    await enterSentinel();
+
+    expect(fetchPage).toHaveBeenCalledTimes(1);
+    expect(navigation.push).toHaveBeenCalledTimes(1);
   });
 });
 

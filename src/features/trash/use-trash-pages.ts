@@ -65,6 +65,7 @@ export function useTrashPages(
       setNextCursor(page.nextCursor);
     } catch (error) {
       if (error instanceof SessionExpiredError) {
+        setNextCursor(null);
         router.push("/login?next=%2Fsettings%2Ftrash");
       } else if (error instanceof TrashAccessRevokedError) {
         setItems([]);
