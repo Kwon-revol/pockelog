@@ -163,6 +163,17 @@ select
 같은 `missing` 결과를 반환한다. SQL Editor에서 마이그레이션 적용 후 소유자 계정으로 조회·복원을,
 일반 구성원 계정으로 조회 거부를 각각 확인한 다음 애플리케이션 코드를 배포한다.
 
+### 휴지통 기능 배포 순서
+
+1. 전용 개발 Supabase의 SQL Editor에서 일곱 번째 마이그레이션을 한 번 적용한다.
+2. 위 확인 쿼리를 실행해 함수 존재·`authenticated` 실행 권한·RLS·직접 `delete` 권한 차단이 모두 `true`인지 확인한다.
+3. 소유자 계정으로 삭제 거래 조회와 복원을, 일반 구성원 계정으로 휴지통 조회 거부를 수동으로 확인한다.
+4. 개발 프로젝트에서만 `allow_destructive_e2e`를 잠시 `true`로 바꾸고, 프로젝트 ref·URL·키를 명시한 상태로 `npm run test:e2e -- --project=desktop-chromium --project=mobile-chromium tests/e2e/ledger.spec.ts`를 실행한다. 검증 직후 표시는 다시 `false`로 바꾼다.
+5. 운영 Supabase의 프로젝트 이름과 ref를 다시 확인한 뒤 일곱 번째 마이그레이션을 한 번 적용하고, 위 확인 쿼리와 소유자·일반 구성원 확인을 반복한다. 운영 프로젝트의 파괴적 E2E 표시는 켜지 않는다.
+6. `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`, `SUPABASE_SECRET_KEY`, `NEXT_PUBLIC_APP_URL`이 운영 대상인지 확인한 뒤, 휴지통 기능을 포함한 현재 빌드를 Vercel에서 새 Production 배포로 다시 빌드·배포한다.
+
+휴지통에는 CSV 내보내기나 CSV 가져오기 기능을 제공하지 않는다.
+
 로컬에 Docker 또는 Supabase CLI가 없으면 `supabase test db`를 대신할 수 없으므로, 위 확인
 쿼리를 대상 프로젝트의 SQL Editor에서 직접 실행한 결과를 배포 기록에 남긴다. 이 경로는
 스키마 항목의 존재를 확인하는 수동 검증이며, 전용 개발 프로젝트의 호스팅 E2E를 운영에서
