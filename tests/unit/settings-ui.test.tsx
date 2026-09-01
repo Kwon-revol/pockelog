@@ -86,6 +86,15 @@ describe("SettingsScreen", () => {
     expect(screen.getByLabelText("장부 이름")).toBeDisabled();
   });
 
+  it("shows trash data management only to the owner", () => {
+    renderScreen();
+    expect(screen.getByRole("link", { name: "휴지통 보기" })).toHaveAttribute("href", "/settings/trash");
+
+    cleanup();
+    renderScreen({ data: { ...data, isOwner: false } });
+    expect(screen.queryByRole("link", { name: "휴지통 보기" })).not.toBeInTheDocument();
+  });
+
   it("shows an action result from an immediate category change", async () => {
     const user = userEvent.setup();
     renderScreen({ setCategoryActiveAction: vi.fn(successChangeAction) });

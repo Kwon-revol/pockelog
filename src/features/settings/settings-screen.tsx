@@ -1,5 +1,7 @@
 "use client";
 
+import Link from "next/link";
+
 import {
   CategoryManager,
   type CategoryActiveAction,
@@ -45,6 +47,14 @@ export function SettingsScreen({
       <LedgerSettingsForm action={updateLedgerAction} isOwner={data.isOwner} ledger={data.ledger} />
       <CategoryManager activeAction={setCategoryActiveAction} categories={data.categories} createAction={createCategoryAction} isOwner={data.isOwner} moveAction={moveCategoryAction} updateAction={updateCategoryAction} />
       {sharedLedgerData && sharedLedgerActions ? <SharedLedgerManager actions={sharedLedgerActions} data={sharedLedgerData} /> : null}
+      {data.isOwner ? (
+        <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
+          <p className="text-xs font-bold uppercase tracking-[0.18em] text-emerald-700">장부 데이터</p>
+          <h2 className="mt-1 text-lg font-black text-slate-950">데이터 관리</h2>
+          <p className="mt-2 text-sm leading-6 text-slate-500">삭제한 거래를 확인하고 복원하거나 영구 삭제할 수 있어요.</p>
+          <Link className="mt-4 inline-flex rounded-2xl border border-emerald-200 px-4 py-2.5 text-sm font-bold text-emerald-700 hover:bg-emerald-50" href="/settings/trash">휴지통 보기</Link>
+        </section>
+      ) : null}
       <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6"><h2 className="text-lg font-black text-slate-950">계정</h2><p className="mt-1 text-sm text-slate-500">이 기기에서 PockeLog 사용을 마칩니다.</p><form action={logoutAction} className="mt-4"><button className="rounded-2xl border border-rose-200 px-5 py-3 text-sm font-bold text-rose-700 hover:bg-rose-50" type="submit">로그아웃</button></form></section>
     </div>
   );
