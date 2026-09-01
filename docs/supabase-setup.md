@@ -127,6 +127,42 @@ Task 7의 호스팅 검증 단계에서 `tests/db/007_pension_tax_credit.test.sq
 8. 배포된 사이트에서 로그인 후 세금 탭, 연금저축·IRP 프리셋, 가계부와 통계 합계를
    비파괴적으로 확인한다.
 
+## 거래 휴지통 마이그레이션 적용
+
+연금 세액공제 마이그레이션까지 적용된 프로젝트에서 휴지통 화면 코드 배포 전에
+`supabase/migrations/202609010007_transaction_trash.sql`을 SQL Editor에 한 번 실행한다.
+이 마이그레이션은 장부 소유자 전용 삭제 거래 조회·복원·영구 삭제 RPC를 추가한다.
+
+실행 후 아래 확인 쿼리의 함수 존재, 로그인 역할 실행 권한, `transactions` RLS가 모두
+`true`이고 직접 `delete` 권한은 `false`인지 확인한다.
+
+```sql
+select
+  to_regprocedure('public.get_deleted_transactions(uuid,timestamp with time zone,uuid,integer)') is not null
+    as deleted_transactions_rpc_exists,
+  to_regprocedure('public.restore_deleted_transaction(uuid)') is not null
+    as restore_deleted_transaction_rpc_exists,
+  to_regprocedure('public.permanently_delete_transaction(uuid)') is not null
+    as permanently_delete_transaction_rpc_exists,
+  has_function_privilege('authenticated', 'public.get_deleted_transactions(uuid,timestamp with time zone,uuid,integer)', 'execute')
+    as authenticated_can_list_trash,
+  has_function_privilege('authenticated', 'public.restore_deleted_transaction(uuid)', 'execute')
+    as authenticated_can_restore_trash,
+  has_function_privilege('authenticated', 'public.permanently_delete_transaction(uuid)', 'execute')
+    as authenticated_can_permanently_delete_trash,
+  not has_function_privilege('anon', 'public.get_deleted_transactions(uuid,timestamp with time zone,uuid,integer)', 'execute')
+    as anon_cannot_list_trash,
+  not has_table_privilege('authenticated', 'public.transactions', 'delete')
+    as authenticated_cannot_directly_delete_transactions,
+  (select relrowsecurity from pg_class where oid = 'public.transactions'::regclass)
+    as transactions_rls_enabled;
+```
+
+휴지통 RPC는 개인 장부와 공동 장부 모두 소유자만 사용할 수 있다. 일반 구성원과 관계없는
+사용자가 삭제 거래의 존재를 알아낼 수 없도록 복원·영구 삭제는 권한이 없거나 대상이 없을 때
+같은 `missing` 결과를 반환한다. SQL Editor에서 마이그레이션 적용 후 소유자 계정으로 조회·복원을,
+일반 구성원 계정으로 조회 거부를 각각 확인한 다음 애플리케이션 코드를 배포한다.
+
 로컬에 Docker 또는 Supabase CLI가 없으면 `supabase test db`를 대신할 수 없으므로, 위 확인
 쿼리를 대상 프로젝트의 SQL Editor에서 직접 실행한 결과를 배포 기록에 남긴다. 이 경로는
 스키마 항목의 존재를 확인하는 수동 검증이며, 전용 개발 프로젝트의 호스팅 E2E를 운영에서
@@ -192,8 +228,14 @@ Task 7의 호스팅 검증 단계에서 `tests/db/007_pension_tax_credit.test.sq
 - 현재 또는 이전 장부의 본인 작성 활성 지출만 계산하는 연금 납입 요약
 - 탈퇴한 장부명을 숨기고 거래 권한을 함께 반환하는 안정적인 페이지 조회 함수
 
+일곱 번째 마이그레이션은 다음을 추가한다.
+
+- 장부 소유자만 읽을 수 있는 삭제 거래 페이지 조회 함수와 51번째 sentinel 행
+- 삭제 시각·삭제자를 함께 비우는 소유자 전용 복원 함수
+- 직접 테이블 삭제 권한 없이 삭제 거래만 제거하는 소유자 전용 영구 삭제 함수
+
 `tests/db/`의 pgTAP 테스트는 추후 Docker 또는 CI 기반 Supabase 테스트 환경을 추가할 때 실행한다.
-현재 방식에서는 전용 개발 Supabase에 여섯 마이그레이션을 적용한 뒤 파괴적 E2E 안전 표시를
+현재 방식에서는 전용 개발 Supabase에 일곱 마이그레이션을 적용한 뒤 파괴적 E2E 안전 표시를
 켠 경우에만 `tests/e2e/ledger.spec.ts`, `tests/e2e/statistics.spec.ts`, `tests/e2e/settings.spec.ts`,
 `tests/e2e/shared-ledgers.spec.ts`, `tests/e2e/tax.spec.ts`를 실행한다. 공동 장부와 세금 시나리오는 두 계정을 생성해 초대·거래·작성자 분리를 확인하고,
 안전 표시를 다시 검증한 뒤 테스트 계정을 삭제한다. 운영 프로젝트의
