@@ -70,7 +70,7 @@ describe("getProfilePageData", () => {
     expect(fake.spies.from).not.toHaveBeenCalled();
   });
 
-  it("maps public name, private phone, and authenticated email for the current user only", async () => {
+  it("loads the public profile by its id and the private profile by user_id for the current user only", async () => {
     const fake = serverClient();
     mocks.createServerClient.mockResolvedValue(fake.client);
 
@@ -83,9 +83,9 @@ describe("getProfilePageData", () => {
     expect(fake.spies.from).toHaveBeenCalledWith("user_private_profiles");
     expect(fake.spies.profileQuery.select).toHaveBeenCalledWith("display_name");
     expect(fake.spies.privateProfileQuery.select).toHaveBeenCalledWith("phone_normalized");
-    expect(fake.spies.profileQuery.eq).toHaveBeenCalledWith("user_id", userId);
+    expect(fake.spies.profileQuery.eq).toHaveBeenCalledWith("id", userId);
     expect(fake.spies.privateProfileQuery.eq).toHaveBeenCalledWith("user_id", userId);
-    expect(fake.spies.profileQuery.eq).not.toHaveBeenCalledWith("user_id", otherUserId);
+    expect(fake.spies.profileQuery.eq).not.toHaveBeenCalledWith("id", otherUserId);
     expect(fake.spies.privateProfileQuery.eq).not.toHaveBeenCalledWith("user_id", otherUserId);
   });
 
