@@ -19,6 +19,7 @@ describe("profile schemas", () => {
     { displayName: "", phone: "01012345678" },
     { displayName: "a".repeat(31), phone: "01012345678" },
     { displayName: "사용자", phone: "010 1234 5678" },
+    { displayName: "사용자", phone: " 01012345678 " },
     { displayName: "사용자", phone: "" },
   ])("rejects invalid profile input %#", (input) => {
     expect(profileFormSchema.safeParse(input).success).toBe(false);
@@ -29,6 +30,11 @@ describe("profile schemas", () => {
       currentPassword: "",
       newPassword: "new-password1!",
       confirmPassword: "new-password1!",
+    }).success).toBe(false);
+    expect(passwordChangeFormSchema.safeParse({
+      currentPassword: "old-password1!",
+      newPassword: "short7!",
+      confirmPassword: "short7!",
     }).success).toBe(false);
     expect(passwordChangeFormSchema.safeParse({
       currentPassword: "old-password1!",
