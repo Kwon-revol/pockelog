@@ -8,9 +8,14 @@ export const metadata: Metadata = { title: "로그인" };
 export default async function LoginPage({
   searchParams,
 }: {
-  searchParams: Promise<{ next?: string; passwordReset?: string }>;
+  searchParams: Promise<{ next?: string; passwordReset?: string; passwordChanged?: string }>;
 }) {
-  const { next, passwordReset } = await searchParams;
+  const { next, passwordReset, passwordChanged } = await searchParams;
+  const notice = passwordChanged === "1"
+    ? "비밀번호가 변경됐습니다. 새 비밀번호로 다시 로그인해 주세요."
+    : passwordReset === "1"
+      ? "비밀번호가 변경됐습니다. 새 비밀번호로 로그인해 주세요."
+      : undefined;
 
   return (
     <>
@@ -20,7 +25,7 @@ export default async function LoginPage({
       </div>
       <LoginForm
         nextPath={safeNextPath(next)}
-        notice={passwordReset === "1" ? "비밀번호가 변경됐습니다. 새 비밀번호로 로그인해 주세요." : undefined}
+        notice={notice}
       />
     </>
   );
