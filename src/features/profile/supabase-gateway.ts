@@ -42,8 +42,14 @@ async function changePassword(
       email: current.user.email,
       password: input.currentPassword,
     });
-    if (verified.error || verified.data.user?.id !== current.user.id) {
-      return "invalid-current-password";
+    if (verified.error) return "invalid-current-password";
+    if (verified.data.user?.id !== current.user.id) {
+      try {
+        await supabase.auth.signOut({ scope: "local" });
+      } catch {
+        // The verification response may have replaced the session; force login either way.
+      }
+      return "unauthenticated";
     }
 
     const changed = await supabase.auth.updateUser({ password: input.newPassword });

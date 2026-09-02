@@ -100,16 +100,31 @@ describe("createSupabaseProfileGateway", () => {
     expect(fake.spies.updateUser).not.toHaveBeenCalled();
   });
 
-  it("rejects a verified identity that differs from the original session user", async () => {
-    const fake = serverClient({
-      verified: { data: { user: { id: "22222222-2222-4222-8222-222222222222" } }, error: null },
-    });
-    mocks.createServerClient.mockResolvedValue(fake.client);
-    const gateway = await createSupabaseProfileGateway();
+  it.each([
+    ["a different user and successful cleanup", { id: "22222222-2222-4222-8222-222222222222" }, "success"],
+    ["no user and a returned cleanup error", null, "returned error"],
+    ["a different user and a thrown cleanup error", { id: "22222222-2222-4222-8222-222222222222" }, "thrown error"],
+  ] as const)(
+    "clears a session replaced by successful verification with %s",
+    async (_case, verifiedUser, cleanupResult) => {
+      const fake = serverClient({
+        verified: { data: { user: verifiedUser }, error: null },
+        localLogout: {
+          error: cleanupResult === "returned error" ? { message: "secret local cleanup error" } : null,
+        },
+      });
+      if (cleanupResult === "thrown error") {
+        fake.spies.signOut.mockRejectedValueOnce(new Error("secret local cleanup exception"));
+      }
+      mocks.createServerClient.mockResolvedValue(fake.client);
+      const gateway = await createSupabaseProfileGateway();
 
-    await expect(gateway.changePassword(passwordInput)).resolves.toBe("invalid-current-password");
-    expect(fake.spies.updateUser).not.toHaveBeenCalled();
-  });
+      await expect(gateway.changePassword(passwordInput)).resolves.toBe("unauthenticated");
+      expect(fake.spies.signOut).toHaveBeenCalledOnce();
+      expect(fake.spies.signOut).toHaveBeenCalledWith({ scope: "local" });
+      expect(fake.spies.updateUser).not.toHaveBeenCalled();
+    },
+  );
 
   it("updates the password and globally signs out after matching identity verification", async () => {
     const fake = serverClient();
