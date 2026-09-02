@@ -41,6 +41,10 @@ Docker는 필요하지 않습니다. 새 Supabase 프로젝트의 SQL Editor에�
 
 초기 개발 중 이메일 인증을 끄면 가입 직후 개인 장부로 이동합니다. 이메일 인증을
 켠 경우에는 Supabase Auth URL 설정에 운영 도메인의 `/auth/callback`을 허용해야 합니다.
+비밀번호 재설정 메일은 Supabase의 Reset password 템플릿을 `token_hash` 콜백 형식으로
+설정해야 하며, 정확한 URL과 템플릿은 `docs/supabase-setup.md`에 정리되어 있습니다.
+Supabase 기본 메일 서버는 프로젝트 팀 이메일로만 시험할 수 있으므로 일반 사용자에게
+메일을 보내려면 별도 SMTP 설정이 필요합니다.
 
 ## 연금 세액공제 사용
 

@@ -1,10 +1,15 @@
 import type { Metadata } from "next";
+import { redirect } from "next/navigation";
 
+import { getPasswordRecoverySession } from "@/features/auth/password-recovery-session";
 import { ResetPasswordForm } from "@/features/auth/reset-password-form";
 
 export const metadata: Metadata = { title: "새 비밀번호 설정" };
 
-export default function ResetPasswordPage() {
+export default async function ResetPasswordPage() {
+  const recoverySession = await getPasswordRecoverySession();
+  if (!recoverySession) redirect("/forgot-password?invalidLink=1");
+
   return (
     <>
       <div className="mb-8 text-center">

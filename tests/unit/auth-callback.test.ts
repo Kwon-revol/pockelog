@@ -56,4 +56,47 @@ describe("auth callback", () => {
     expect(recoveryCookie?.path).toBe("/reset-password");
     expect(recoveryCookie?.maxAge).toBe(900);
   });
+
+  it("verifies a recovery token hash and opens the reset screen", async () => {
+    const verifyOtp = vi.fn().mockResolvedValue({
+      data: { user: { id: "11111111-1111-4111-8111-111111111111" } },
+      error: null,
+    });
+    mocks.createServerClient.mockResolvedValue({ auth: { verifyOtp } });
+    const request = new NextRequest(
+      "https://pockelog.vercel.app/auth/callback?next=/reset-password&token_hash=recovery-hash&type=recovery",
+    );
+
+    const response = await GET(request);
+
+    expect(verifyOtp).toHaveBeenCalledWith({
+      token_hash: "recovery-hash",
+      type: "recovery",
+    });
+    expect(response.headers.get("location")).toBe(
+      "https://pockelog.vercel.app/reset-password",
+    );
+    expect(response.cookies.get("pockelog-password-recovery")?.value).toBeTruthy();
+  });
+
+  it("rejects an invalid recovery token hash without exposing it in the redirect", async () => {
+    mocks.createServerClient.mockResolvedValue({
+      auth: {
+        verifyOtp: vi.fn().mockResolvedValue({
+          data: { user: null },
+          error: { message: "expired" },
+        }),
+      },
+    });
+    const request = new NextRequest(
+      "https://pockelog.vercel.app/auth/callback?next=/reset-password&token_hash=expired-secret&type=recovery",
+    );
+
+    const response = await GET(request);
+
+    expect(response.headers.get("location")).toBe(
+      "https://pockelog.vercel.app/forgot-password?invalidLink=1",
+    );
+    expect(response.headers.get("location")).not.toContain("expired-secret");
+  });
 });

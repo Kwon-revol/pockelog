@@ -1,7 +1,6 @@
 "use server";
 
 import { redirect } from "next/navigation";
-import { cookies } from "next/headers";
 
 import type { AuthActionState } from "@/features/auth/action-state";
 import {
@@ -19,9 +18,9 @@ import { getPublicEnv } from "@/shared/config/env";
 import { createServerClient } from "@/shared/supabase/server";
 import { createSupabaseAuthGateway } from "@/features/auth/supabase-gateway";
 import {
-  isValidPasswordRecoveryToken,
   PASSWORD_RECOVERY_COOKIE,
 } from "@/features/auth/password-recovery-state";
+import { getPasswordRecoverySession } from "@/features/auth/password-recovery-session";
 
 function formValue(formData: FormData, key: string) {
   const value = formData.get(key);
@@ -115,9 +114,9 @@ export async function forgotPasswordAction(
     };
   }
 
-  const supabase = await createServerClient();
-  const env = getPublicEnv();
   try {
+    const supabase = await createServerClient();
+    const env = getPublicEnv();
     await supabase.auth.resetPasswordForEmail(parsed.data.email, {
       redirectTo: `${env.NEXT_PUBLIC_APP_URL}/auth/callback?next=/reset-password`,
     });
@@ -148,20 +147,14 @@ export async function resetPasswordAction(
     };
   }
 
-  const supabase = await createServerClient();
-  const { data: userData, error: userError } = await supabase.auth.getUser();
-  const cookieStore = await cookies();
-  const recoveryToken = cookieStore.get(PASSWORD_RECOVERY_COOKIE)?.value;
-  if (
-    userError
-    || !userData.user
-    || !isValidPasswordRecoveryToken(recoveryToken, userData.user.id)
-  ) {
+  const recoverySession = await getPasswordRecoverySession();
+  if (!recoverySession) {
     return {
       status: "error",
       message: "재설정 링크가 만료됐거나 유효하지 않습니다. 링크를 다시 요청해 주세요.",
     };
   }
+  const { cookieStore, supabase } = recoverySession;
 
   const { error } = await supabase.auth.updateUser({
     password: parsed.data.password,
@@ -183,7 +176,7 @@ export async function resetPasswordAction(
   });
 
   try {
-    await supabase.auth.signOut();
+    await supabase.auth.signOut({ scope: "global" });
   } catch {
     // The password is already changed; the login screen remains the safe destination.
   }

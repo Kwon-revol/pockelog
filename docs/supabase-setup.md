@@ -2,6 +2,33 @@
 
 현재 개발 방식은 Docker 없이 호스팅된 Supabase 프로젝트를 사용한다.
 
+## 비밀번호 재설정 이메일 설정
+
+비밀번호 재설정은 서버에서 검증할 수 있는 `token_hash` 링크를 사용한다. Supabase Dashboard의
+**Authentication → URL Configuration**에서 다음 값을 설정한다.
+
+- **Site URL**: Vercel 운영 주소(예: `https://pockelog.vercel.app`)
+- **Redirect URLs**: `https://pockelog.vercel.app/auth/callback`
+- Preview도 시험한다면 해당 Preview 주소의 `/auth/callback`을 별도로 허용한다.
+
+그다음 **Authentication → Emails → Templates → Reset password**에서 링크를 아래처럼 바꾼다.
+`{{ .RedirectTo }}`에는 앱이 지정한 `/auth/callback?next=/reset-password` 주소가 들어온다.
+
+```html
+<a href="{{ .RedirectTo }}&amp;token_hash={{ .TokenHash }}&amp;type=recovery">
+  PockeLog 비밀번호 재설정
+</a>
+```
+
+기존 `{{ .ConfirmationURL }}` 링크로 발송된 메일도 PKCE `code` 콜백으로 계속 처리하지만,
+다른 브라우저나 기기에서 안정적으로 열 수 있도록 운영 템플릿은 위 `token_hash` 형식을 사용한다.
+링크는 한 번 사용하거나 만료되면 다시 쓸 수 없으며, 새 비밀번호 저장 후 모든 로그인 세션을 종료한다.
+
+Supabase 기본 메일 서버는 프로젝트 팀에 등록된 이메일에만 보내며 발송량도 매우 제한적이다.
+일반 사용자에게 운영하려면 **Authentication → Emails → SMTP Settings**에서 별도 SMTP를 설정하고,
+메일 제공자의 링크 추적 기능은 인증 링크를 변형하지 않도록 끈다. SMTP를 설정하기 전에는 프로젝트
+팀 이메일로만 `비밀번호 찾기 → 이메일 링크 → 새 비밀번호 → 다시 로그인` 흐름을 확인한다.
+
 ## 최초 스키마 적용
 
 1. Supabase Dashboard에서 PockeLog 프로젝트를 연다.

@@ -4,10 +4,12 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 vi.mock("@/features/auth/actions", () => ({
   forgotPasswordAction: vi.fn(),
   loginAction: vi.fn(),
+  resetPasswordAction: vi.fn(),
 }));
 
 import { ForgotPasswordForm } from "@/features/auth/forgot-password-form";
 import { LoginForm } from "@/features/auth/login-form";
+import { ResetPasswordForm } from "@/features/auth/reset-password-form";
 
 afterEach(cleanup);
 
@@ -23,6 +25,15 @@ describe("password recovery notices", () => {
     render(<LoginForm notice="비밀번호가 변경됐습니다. 새 비밀번호로 로그인해 주세요." />);
     expect(screen.getByRole("status")).toHaveTextContent(
       "비밀번호가 변경됐습니다. 새 비밀번호로 로그인해 주세요.",
+    );
+  });
+
+  it("offers a new recovery request from the replacement-password form", () => {
+    render(<ResetPasswordForm />);
+
+    expect(screen.getByRole("link", { name: "새 재설정 링크 요청하기" })).toHaveAttribute(
+      "href",
+      "/forgot-password",
     );
   });
 });

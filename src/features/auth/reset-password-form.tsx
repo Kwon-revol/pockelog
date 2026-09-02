@@ -1,5 +1,6 @@
 "use client";
 
+import Link from "next/link";
 import { useActionState } from "react";
 
 import { initialAuthActionState } from "@/features/auth/action-state";
@@ -45,6 +46,9 @@ export function ResetPasswordForm() {
       ) : null}
 
       <SubmitButton>비밀번호 변경</SubmitButton>
+      <Link href="/forgot-password" className="block text-center text-sm font-bold text-emerald-700">
+        새 재설정 링크 요청하기
+      </Link>
     </form>
   );
 }

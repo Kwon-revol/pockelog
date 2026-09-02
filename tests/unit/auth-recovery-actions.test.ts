@@ -66,6 +66,18 @@ describe("password recovery actions", () => {
     },
   );
 
+  it("keeps the recovery request response private when the auth client cannot be created", async () => {
+    mocks.createServerClient.mockRejectedValue(new Error("missing configuration"));
+
+    await expect(forgotPasswordAction(
+      initialAuthActionState,
+      form({ email: "user@example.com" }),
+    )).resolves.toEqual({
+      status: "success",
+      message: "가입된 이메일이라면 비밀번호 재설정 링크를 보내드렸습니다.",
+    });
+  });
+
   it("rejects password changes without an authenticated recovery session", async () => {
     const updateUser = vi.fn();
     mocks.createServerClient.mockResolvedValue({
@@ -132,7 +144,7 @@ describe("password recovery actions", () => {
     );
 
     expect(updateUser).toHaveBeenCalledWith({ password: "new-password1!" });
-    expect(signOut).toHaveBeenCalledOnce();
+    expect(signOut).toHaveBeenCalledWith({ scope: "global" });
     expect(mocks.cookieSet).toHaveBeenCalledWith(
       "pockelog-password-recovery",
       "",
@@ -163,5 +175,17 @@ describe("password recovery actions", () => {
     expect(result.status).toBe("error");
     expect(updateUser).not.toHaveBeenCalled();
     expect(mocks.cookieSet).not.toHaveBeenCalled();
+  });
+
+  it("returns an expired-link message when the auth client cannot be created", async () => {
+    mocks.createServerClient.mockRejectedValue(new Error("missing configuration"));
+
+    await expect(resetPasswordAction(
+      initialAuthActionState,
+      form({ password: "new-password1!", confirmPassword: "new-password1!" }),
+    )).resolves.toEqual({
+      status: "error",
+      message: "재설정 링크가 만료됐거나 유효하지 않습니다. 링크를 다시 요청해 주세요.",
+    });
   });
 });
