@@ -217,18 +217,39 @@ select
 `supabase/migrations/202609020008_account_profile_settings.sql`을 SQL Editor에 한 번 실행한다.
 이 마이그레이션은 로그인한 사용자의 표시 이름과 전화번호를 한 호출에서 함께 수정하는 함수를 추가한다.
 
-실행 후 아래 값이 `true`인지 확인한다.
+### 계정 프로필 설정 배포 순서
+
+1. 대상 프로젝트와 최신 백업 또는 복구 가능 지점을 확인하고, 적용 기록에 확인 시각과 대상 ref를 남긴다.
+2. 이미 001부터 007까지 적용된 대상에서만 008 파일을 SQL Editor에 한 번 실행한다. 기존 코드가 배포된 뒤에 실행하지 않는다.
+3. 아래 쿼리로 함수 존재와 익명·로그인 역할의 실행 권한을 확인한다. 세 값은 모두 `true`여야 한다.
+4. 전용 개발 프로젝트에서는 본인 계정으로 사용자명·전화번호 저장과 새로고침 유지를 확인하고, 공동 장부 소유자와 일반 구성원으로 각각 로그인해 일반 구성원이 자신의 프로필만 바꾸고 소유자 이름은 유지되는지 수동 확인한다.
+5. 전용 개발 프로젝트에서만 필요 시 `allow_destructive_e2e` 표시를 잠시 켠 뒤 PC·모바일 프로필 E2E를 실행하고, 끝나면 즉시 다시 `false`로 바꾼다. 운영 프로젝트에서는 이 표시를 켜지 않는다.
+6. 운영 프로젝트에서도 같은 함수·권한 확인과 본인/타인 권한 수동 검증을 끝낸 다음, Vercel 환경변수가 대상 프로젝트를 가리키는지 확인하고 현재 앱 빌드를 새 Production 배포로 배포한다.
+7. 배포 사이트에서 잘못된 현재 비밀번호가 거부되는지, 올바른 현재 비밀번호로 변경하면 로그인 화면으로 이동하는지, 이전 비밀번호는 실패하고 새 비밀번호로 다시 로그인되는지 확인한다.
+
+함수·권한 확인 쿼리는 다음과 같다.
 
 ```sql
 select
   to_regprocedure('public.update_my_profile(text,text)') is not null
-    as update_my_profile_exists;
+    as update_my_profile_exists,
+  has_function_privilege('authenticated', 'public.update_my_profile(text,text)', 'execute')
+    as authenticated_can_update_own_profile,
+  not has_function_privilege('anon', 'public.update_my_profile(text,text)', 'execute')
+    as anon_cannot_update_profile;
 ```
 
 적용 순서는 `202608260001_initial_auth_and_ledgers.sql`부터
 `202609020008_account_profile_settings.sql`까지 번호 순서다. 여덟 번째 마이그레이션 확인이 끝난 뒤
 계정 프로필 설정 코드를 배포한다. 함수는 로그인한 본인의 행만 변경하며 표시 이름과 전화번호 중
 어느 한쪽이라도 저장하지 못하면 호출 전체가 실패한다.
+
+전용 개발 프로젝트의 E2E는 아래처럼 명시적으로 두 브라우저 프로젝트를 지정한다. 호스팅 자격 증명이나
+파괴적 E2E 허용 표시가 없으면 테스트는 데이터를 만들지 않고 건너뛴다.
+
+```bash
+npm run test:e2e -- --project=desktop-chromium --project=mobile-chromium tests/e2e/settings.spec.ts
+```
 
 ### 계산 범위와 공식 근거
 
