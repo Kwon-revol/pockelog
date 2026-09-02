@@ -37,6 +37,12 @@ async function login(page: Page, identifier: string, password: string) {
   await page.getByRole("button", { name: "로그인" }).click();
 }
 
+async function fillPasswordChange(page: Page, currentPassword: string) {
+  await page.getByLabel("현재 비밀번호").fill(currentPassword);
+  await page.getByLabel("새 비밀번호").fill(changedPassword);
+  await page.getByLabel("새 비밀번호 확인").fill(changedPassword);
+}
+
 async function selectVisibleLedger(page: Page, label: string) {
   const selector = page.locator('select[aria-label="현재 장부"]:visible');
   await selector.selectOption({ label });
@@ -74,13 +80,11 @@ test.describe("호스팅된 개발 Supabase 설정", () => {
       await expect(page.getByLabel("사용자명")).toHaveValue("변경 사용자");
       await expect(page.getByLabel("전화번호")).toHaveValue("010-9876-5432");
 
-      await page.getByLabel("현재 비밀번호").fill("Pockelog-incorrect-2026!");
-      await page.getByLabel("새 비밀번호").fill(changedPassword);
-      await page.getByLabel("새 비밀번호 확인").fill(changedPassword);
+      await fillPasswordChange(page, "Pockelog-incorrect-2026!");
       await page.getByRole("button", { name: "비밀번호 변경" }).click();
       await expect(page.getByRole("alert")).toContainText("현재 비밀번호를 확인해 주세요");
 
-      await page.getByLabel("현재 비밀번호").fill(initialPassword);
+      await fillPasswordChange(page, initialPassword);
       await page.getByRole("button", { name: "비밀번호 변경" }).click();
       await expect(page).toHaveURL(/\/login\?passwordChanged=1$/);
       await expect(page.getByRole("status")).toContainText("새 비밀번호로 다시 로그인해 주세요");

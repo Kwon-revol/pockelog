@@ -4,7 +4,7 @@ import { normalizePhone } from "@/shared/domain/phone";
 
 export const profileFormSchema = z.object({
   displayName: z.string().trim().min(1, "이름을 입력해 주세요.").max(30, "이름은 30자 이하로 입력해 주세요."),
-  phone: z.string().regex(/^[0-9-]+$/, "전화번호 형식을 확인해 주세요.").transform(normalizePhone),
+  phone: z.string().regex(/^(?=.*\d)[0-9-]+$/, "전화번호 형식을 확인해 주세요.").transform(normalizePhone),
 });
 
 export const passwordChangeFormSchema = z.object({

@@ -21,6 +21,7 @@ describe("profile schemas", () => {
     { displayName: "사용자", phone: "010 1234 5678" },
     { displayName: "사용자", phone: " 01012345678 " },
     { displayName: "사용자", phone: "" },
+    { displayName: "사용자", phone: "---" },
   ])("rejects invalid profile input %#", (input) => {
     expect(profileFormSchema.safeParse(input).success).toBe(false);
   });
