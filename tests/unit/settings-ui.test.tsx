@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { SettingsScreen } from "@/features/settings/settings-screen";
+import type { ProfilePageData } from "@/features/profile/types";
 import type { SettingsActionState, SettingsPageData } from "@/features/settings/types";
 
 const data: SettingsPageData = {
@@ -18,6 +19,8 @@ const data: SettingsPageData = {
 
 const successFormAction = async (): Promise<SettingsActionState> => ({ status: "success" });
 const successChangeAction = async (): Promise<SettingsActionState> => ({ status: "success", message: "변경했어요." });
+const profileData: ProfilePageData = { displayName: "포켓", email: "pocket@example.com", phone: "01012345678" };
+const successProfileAction = async () => ({ status: "success" as const });
 
 function renderScreen(overrides: Partial<React.ComponentProps<typeof SettingsScreen>> = {}) {
   return render(
@@ -29,6 +32,9 @@ function renderScreen(overrides: Partial<React.ComponentProps<typeof SettingsScr
       setCategoryActiveAction={successChangeAction}
       moveCategoryAction={successChangeAction}
       logoutAction={async () => undefined}
+      profileData={profileData}
+      updateProfileAction={successProfileAction}
+      changePasswordAction={successProfileAction}
       {...overrides}
     />,
   );
@@ -84,6 +90,13 @@ describe("SettingsScreen", () => {
     expect(screen.queryByRole("button", { name: "분류 추가" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "장부 설정 저장" })).not.toBeInTheDocument();
     expect(screen.getByLabelText("장부 이름")).toBeDisabled();
+  });
+
+  it("shows my profile controls to members as well as ledger owners", () => {
+    renderScreen({ data: { ...data, isOwner: false } });
+
+    expect(screen.getByRole("heading", { name: "내 프로필" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "프로필 저장" })).toBeVisible();
   });
 
   it("shows trash data management only to the owner", () => {

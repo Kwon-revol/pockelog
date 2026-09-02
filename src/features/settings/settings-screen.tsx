@@ -13,6 +13,9 @@ import {
   type SettingsFormAction,
 } from "@/features/settings/ledger-settings-form";
 import type { SettingsPageData } from "@/features/settings/types";
+import { PasswordChangeForm } from "@/features/profile/password-change-form";
+import { ProfileForm } from "@/features/profile/profile-form";
+import type { ProfileFormAction, ProfilePageData } from "@/features/profile/types";
 import {
   SharedLedgerManager,
   type SharedLedgerManagerActions,
@@ -27,6 +30,9 @@ export function SettingsScreen({
   setCategoryActiveAction,
   moveCategoryAction,
   logoutAction,
+  profileData,
+  updateProfileAction,
+  changePasswordAction,
   sharedLedgerData,
   sharedLedgerActions,
 }: {
@@ -37,12 +43,17 @@ export function SettingsScreen({
   setCategoryActiveAction: CategoryActiveAction;
   moveCategoryAction: MoveCategoryAction;
   logoutAction: (formData: FormData) => Promise<void>;
+  profileData: ProfilePageData;
+  updateProfileAction: ProfileFormAction;
+  changePasswordAction: ProfileFormAction;
   sharedLedgerData?: SharedLedgerPageData;
   sharedLedgerActions?: SharedLedgerManagerActions;
 }) {
   return (
     <div className="space-y-7">
       <header><p className="text-sm font-semibold text-emerald-700">내 장부 관리</p><h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950">설정</h1><p className="mt-2 text-sm text-slate-500">정산 기간과 거래 분류를 내 사용 방식에 맞게 관리하세요.</p></header>
+      <ProfileForm action={updateProfileAction} data={profileData} />
+      <PasswordChangeForm action={changePasswordAction} />
       {!data.isOwner ? <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">장부 소유자만 설정을 변경할 수 있어요. 현재 장부의 설정은 읽기 전용으로 표시됩니다.</p> : null}
       <LedgerSettingsForm action={updateLedgerAction} isOwner={data.isOwner} ledger={data.ledger} />
       <CategoryManager activeAction={setCategoryActiveAction} categories={data.categories} createAction={createCategoryAction} isOwner={data.isOwner} moveAction={moveCategoryAction} updateAction={updateCategoryAction} />
