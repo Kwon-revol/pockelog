@@ -211,6 +211,25 @@ select
 스키마 항목의 존재를 확인하는 수동 검증이며, 전용 개발 프로젝트의 호스팅 E2E를 운영에서
 실행해도 된다는 뜻이 아니다.
 
+## 계정 프로필 설정 마이그레이션 적용
+
+거래 휴지통 마이그레이션까지 적용된 프로젝트에서 계정 프로필 설정 코드 배포 전에
+`supabase/migrations/202609020008_account_profile_settings.sql`을 SQL Editor에 한 번 실행한다.
+이 마이그레이션은 로그인한 사용자의 표시 이름과 전화번호를 한 호출에서 함께 수정하는 함수를 추가한다.
+
+실행 후 아래 값이 `true`인지 확인한다.
+
+```sql
+select
+  to_regprocedure('public.update_my_profile(text,text)') is not null
+    as update_my_profile_exists;
+```
+
+적용 순서는 `202608260001_initial_auth_and_ledgers.sql`부터
+`202609020008_account_profile_settings.sql`까지 번호 순서다. 여덟 번째 마이그레이션 확인이 끝난 뒤
+계정 프로필 설정 코드를 배포한다. 함수는 로그인한 본인의 행만 변경하며 표시 이름과 전화번호 중
+어느 한쪽이라도 저장하지 못하면 호출 전체가 실패한다.
+
 ### 계산 범위와 공식 근거
 
 현재 앱은 **2026년 근로소득자 연금계좌 세액공제만** 계산한다. 다른 과세연도,
@@ -277,8 +296,13 @@ select
 - 삭제 시각·삭제자를 함께 비우는 소유자 전용 복원 함수
 - 직접 테이블 삭제 권한 없이 삭제 거래만 제거하는 소유자 전용 영구 삭제 함수
 
+여덟 번째 마이그레이션은 다음을 추가한다.
+
+- 로그인한 본인의 표시 이름과 전화번호를 원자적으로 수정하는 함수
+- 익명 호출을 차단하고 기존 본인 행 RLS와 열 단위 변경 권한을 따르는 실행 권한
+
 `tests/db/`의 pgTAP 테스트는 추후 Docker 또는 CI 기반 Supabase 테스트 환경을 추가할 때 실행한다.
-현재 방식에서는 전용 개발 Supabase에 일곱 마이그레이션을 적용한 뒤 파괴적 E2E 안전 표시를
+현재 방식에서는 전용 개발 Supabase에 여덟 마이그레이션을 적용한 뒤 파괴적 E2E 안전 표시를
 켠 경우에만 `tests/e2e/ledger.spec.ts`, `tests/e2e/statistics.spec.ts`, `tests/e2e/settings.spec.ts`,
 `tests/e2e/shared-ledgers.spec.ts`, `tests/e2e/tax.spec.ts`를 실행한다. 공동 장부와 세금 시나리오는 두 계정을 생성해 초대·거래·작성자 분리를 확인하고,
 안전 표시를 다시 검증한 뒤 테스트 계정을 삭제한다. 운영 프로젝트의
