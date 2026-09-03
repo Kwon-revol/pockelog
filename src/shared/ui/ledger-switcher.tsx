@@ -23,11 +23,11 @@ export function LedgerSwitcher({
 
   return (
     <div className={compact ? "min-w-0" : "w-full"}>
-      <label className="block text-xs font-semibold text-emerald-700">
+      <label className={compact ? "flex items-center gap-2 text-xs font-semibold text-emerald-700" : "block text-xs font-semibold text-emerald-700"}>
         현재 장부
         <select
           aria-label="현재 장부"
-          className={`mt-1 w-full rounded-xl border border-emerald-100 bg-white px-3 py-2 font-bold text-slate-900 outline-none focus:border-emerald-500 ${compact ? "max-w-48 text-xs" : "text-sm"}`}
+          className={`rounded-xl border border-emerald-100 bg-white px-3 py-2 font-bold text-slate-900 outline-none focus:border-emerald-500 ${compact ? "min-w-0 flex-1 text-xs" : "mt-1 w-full text-sm"}`}
           disabled={pending}
           onChange={(event) => {
             const next = event.target.value;

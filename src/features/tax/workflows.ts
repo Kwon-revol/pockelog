@@ -8,15 +8,15 @@ export type TaxGateway = {
   getSessionUserId(): Promise<string | null>;
   upsertProfile(
     userId: string,
-    input: { taxYear: 2026; grossSalary: number },
-  ): Promise<"saved" | "forbidden" | "error">;
+  input: { taxYear: number; grossSalary: number },
+): Promise<"saved" | "forbidden" | "error">;
 };
 
 const SAVE_ERROR_MESSAGE = "총급여를 저장하지 못했습니다. 다시 시도해 주세요.";
 
 export async function saveTaxProfile(
   gateway: TaxGateway,
-  input: { taxYear: 2026; grossSalary: number },
+  input: { taxYear: number; grossSalary: number },
 ): Promise<TaxActionState> {
   let userId: string | null;
   try {

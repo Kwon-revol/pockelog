@@ -64,7 +64,7 @@ export function TaxScreen({
   return (
     <div className="space-y-7">
       <header>
-        <p className="text-sm font-semibold text-emerald-700">2026년 연금계좌 세액공제</p>
+        <p className="text-sm font-semibold text-emerald-700">{initialData.taxYear}년 연금계좌 세액공제</p>
         <h1 className="mt-1 text-3xl font-black tracking-tight text-slate-950">세금</h1>
         <p className="mt-2 text-sm text-slate-500">가계부 납입 내역을 바탕으로 남은 한도와 예상 절세 효과를 확인하세요.</p>
       </header>

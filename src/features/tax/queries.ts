@@ -2,6 +2,7 @@ import "server-only";
 
 import {
   calculatePensionTaxBenefit,
+  getSupportedTaxYears,
   getTaxRule,
 } from "@/features/tax/rules";
 import {
@@ -32,7 +33,7 @@ export class TaxQueryError extends Error {
 
 function requireTaxRule(year: number): TaxRule {
   const rule = getTaxRule(year);
-  if (!rule || year !== 2026) throw new TaxQueryError();
+  if (!rule) throw new TaxQueryError();
   return rule;
 }
 
@@ -83,8 +84,8 @@ export async function getTaxPageData(year: number): Promise<TaxPageData> {
     const irpPaid = Number(summary?.irp_paid ?? 0);
 
     return {
-      taxYear: 2026,
-      supportedYears: [2026],
+      taxYear: year,
+      supportedYears: getSupportedTaxYears(),
       grossSalary,
       pensionPaid,
       irpPaid,

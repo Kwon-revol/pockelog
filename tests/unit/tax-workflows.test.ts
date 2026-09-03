@@ -49,7 +49,7 @@ describe("saveTaxProfile", () => {
   });
 
   it("saves the gross salary for the authenticated user", async () => {
-    const saved: Array<{ userId: string; taxYear: 2026; grossSalary: number }> = [];
+    const saved: Array<{ userId: string; taxYear: number; grossSalary: number }> = [];
     const gateway = createGateway({
       async upsertProfile(userId, profile) {
         saved.push({ userId, ...profile });

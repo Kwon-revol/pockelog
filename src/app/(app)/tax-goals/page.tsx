@@ -18,7 +18,7 @@ export default async function TaxGoalsPage() {
   let data;
   let authenticationFailed = false;
   try {
-    data = await getTaxPageData(2026);
+    data = await getTaxPageData(new Date().getFullYear());
   } catch (error) {
     if (error instanceof TaxAuthenticationError) authenticationFailed = true;
     else if (error instanceof TaxQueryError) {

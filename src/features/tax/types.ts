@@ -56,8 +56,8 @@ export type TaxContributionPage = {
 };
 
 export type TaxPageData = {
-  taxYear: 2026;
-  supportedYears: readonly [2026];
+  taxYear: number;
+  supportedYears: readonly number[];
   grossSalary: number | null;
   pensionPaid: number;
   irpPaid: number;

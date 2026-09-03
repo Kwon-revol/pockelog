@@ -8,13 +8,13 @@ import type {
 } from "@/features/tax/types";
 
 export type LoadContributionPage = (
-  year: 2026,
+  year: number,
   cursor: string,
 ) => Promise<TaxContributionPage>;
 
 class SessionExpiredError extends Error {}
 
-export async function fetchContributionPage(year: 2026, cursor: string) {
+export async function fetchContributionPage(year: number, cursor: string) {
   const params = new URLSearchParams({ year: String(year), cursor });
   const response = await fetch(`/api/tax-contributions?${params}`);
   if (response.status === 401) throw new SessionExpiredError("로그인이 필요합니다.");
@@ -24,7 +24,7 @@ export async function fetchContributionPage(year: 2026, cursor: string) {
 
 export function useContributionPages(
   initialPage: TaxContributionPage,
-  year: 2026,
+  year: number,
   loadPage: LoadContributionPage = fetchContributionPage,
 ) {
   const router = useRouter();

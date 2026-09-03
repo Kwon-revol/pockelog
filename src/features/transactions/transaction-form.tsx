@@ -47,7 +47,15 @@ export function TransactionForm({ categories, initialCategoryId, item, action, t
   const [idempotencyKey] = useState(() => crypto.randomUUID());
   const [trashError, setTrashError] = useState<string | null>(null);
   const [trashPending, startTrash] = useTransition();
+  const [amountDisplay, setAmountDisplay] = useState<string>(
+    item?.amount != null ? new Intl.NumberFormat("ko-KR").format(item.amount) : "",
+  );
   const mode = item ? "수정" : "추가";
+
+  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const digits = e.target.value.replace(/[^0-9]/g, "");
+    setAmountDisplay(digits ? new Intl.NumberFormat("ko-KR").format(Number(digits)) : "");
+  };
 
   useEffect(() => {
     if (state.status === "success") onClose();
@@ -78,7 +86,7 @@ export function TransactionForm({ categories, initialCategoryId, item, action, t
 
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-slate-950/30 lg:items-stretch lg:justify-end" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section aria-label={`내역 ${mode}`} aria-modal="true" className="max-h-[92vh] w-full overflow-y-auto rounded-t-[2rem] bg-white p-6 shadow-2xl lg:max-h-none lg:w-[30rem] lg:rounded-none lg:p-8" role="dialog">
+      <section aria-label={`내역 ${mode}`} aria-modal="true" className="max-h-[92vh] w-full overflow-x-hidden overflow-y-auto rounded-t-[2rem] bg-white p-6 shadow-2xl lg:max-h-none lg:w-[30rem] lg:rounded-none lg:p-8" role="dialog">
         <div className="flex items-center justify-between">
           <div><p className="text-xs font-bold text-emerald-700">{item ? "기록 수정" : "새 기록"}</p><h2 className="mt-1 text-2xl font-black">내역 {mode}</h2></div>
           <button aria-label="닫기" className="size-10 rounded-full bg-slate-100 text-xl" onClick={onClose} type="button">×</button>
@@ -101,7 +109,7 @@ export function TransactionForm({ categories, initialCategoryId, item, action, t
           </fieldset>
 
           <label className="block text-sm font-bold text-slate-700">사용 날짜
-            <input className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500" defaultValue={item?.occurredOn ?? todayInSeoul()} name="occurredOn" required type="date" />
+            <input className="mt-2 w-full max-w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500" defaultValue={item?.occurredOn ?? todayInSeoul()} name="occurredOn" required type="date" />
             <FieldError errors={state.fieldErrors?.occurredOn} />
           </label>
           <label className="block text-sm font-bold text-slate-700">내용
@@ -116,7 +124,7 @@ export function TransactionForm({ categories, initialCategoryId, item, action, t
             <FieldError errors={state.fieldErrors?.categoryId} />
           </label>
           <label className="block text-sm font-bold text-slate-700">금액
-            <div className="relative mt-2"><input className="w-full rounded-2xl border border-slate-200 px-4 py-3 pr-10 text-right text-lg font-black outline-none focus:border-emerald-500" defaultValue={item?.amount} inputMode="numeric" name="amount" pattern="[0-9,]*" placeholder="0" required /><span className="absolute right-4 top-3.5 text-sm font-bold text-slate-400">원</span></div>
+            <div className="relative mt-2"><input className="w-full rounded-2xl border border-slate-200 px-4 py-3 pr-10 text-right text-lg font-black outline-none focus:border-emerald-500" inputMode="numeric" name="amount" onChange={handleAmountChange} pattern="[0-9,]*" placeholder="0" required value={amountDisplay} /><span className="absolute right-4 top-3.5 text-sm font-bold text-slate-400">원</span></div>
             <FieldError errors={state.fieldErrors?.amount} />
           </label>
           <label className="block text-sm font-bold text-slate-700">메모 <span className="font-normal text-slate-400">(선택)</span>

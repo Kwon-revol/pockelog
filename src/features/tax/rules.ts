@@ -18,6 +18,10 @@ export function getTaxRule(year: number): TaxRule | null {
   return taxRules[year] ?? null;
 }
 
+export function getSupportedTaxYears(): number[] {
+  return Object.keys(taxRules).map(Number);
+}
+
 export function calculatePensionTaxBenefit(
   rule: TaxRule,
   input: PensionTaxInput,

@@ -36,10 +36,9 @@ export async function saveTaxProfileAction(
     grossSalary: formValue(formData, "grossSalary"),
   });
   if (!parsed.success) return invalidFormState(parsed);
-  if (parsed.data.taxYear !== 2026) return { status: "error", message: "입력한 내용을 확인해 주세요." };
 
   const result = await saveTaxProfile(await createSupabaseTaxGateway(), {
-    taxYear: 2026,
+    taxYear: parsed.data.taxYear,
     grossSalary: parsed.data.grossSalary,
   });
   if (result.status === "success") revalidatePath("/tax-goals");

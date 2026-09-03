@@ -6,18 +6,21 @@ import {
   TaxAuthenticationError,
   TaxQueryError,
 } from "@/features/tax/queries";
+import { getTaxRule } from "@/features/tax/rules";
 
 export async function GET(request: NextRequest) {
-  const year = request.nextUrl.searchParams.get("year");
-  const cursor = year === "2026"
-    ? decodeTaxCursor(request.nextUrl.searchParams.get("cursor"), 2026)
+  const yearParam = request.nextUrl.searchParams.get("year");
+  const yearNum = yearParam !== null ? Number(yearParam) : NaN;
+  const validYear = Number.isInteger(yearNum) && getTaxRule(yearNum) !== null;
+  const cursor = validYear
+    ? decodeTaxCursor(request.nextUrl.searchParams.get("cursor"), yearNum)
     : null;
-  if (year !== "2026" || !cursor) {
+  if (!validYear || !cursor) {
     return Response.json({ message: "잘못된 조회 요청입니다." }, { status: 400 });
   }
 
   try {
-    const page = await getTaxContributionPage(2026, cursor);
+    const page = await getTaxContributionPage(yearNum, cursor);
     return Response.json(page);
   } catch (error) {
     if (error instanceof TaxAuthenticationError) {
