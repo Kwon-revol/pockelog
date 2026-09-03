@@ -1,5 +1,6 @@
 import "server-only";
 
+import { createAdminClient } from "@/shared/supabase/admin";
 import { createServerClient } from "@/shared/supabase/server";
 import type {
   ChangeResult,
@@ -11,6 +12,43 @@ import type {
 type ServerClient = Awaited<ReturnType<typeof createServerClient>>;
 
 export class TransactionContextError extends Error {}
+
+function isMissingRpc(error: { code?: string; message?: string } | null) {
+  return error?.code === "42883" || /does not exist/i.test(error?.message ?? "");
+}
+
+async function trashVisibleTransaction(
+  supabase: ServerClient,
+  context: TransactionSessionContext,
+  id: string,
+): Promise<ChangeResult> {
+  const existing = await supabase
+    .from("transactions")
+    .select("id, created_by")
+    .eq("id", id)
+    .eq("ledger_id", context.ledgerId)
+    .is("deleted_at", null)
+    .maybeSingle();
+  if (existing.error) return "forbidden";
+  if (!existing.data) return "forbidden";
+
+  const { data: ledger, error: ledgerError } = await supabase
+    .from("ledgers")
+    .select("owner_id")
+    .eq("id", context.ledgerId)
+    .maybeSingle();
+  if (ledgerError || !ledger) return "forbidden";
+  if (ledger.owner_id !== context.userId && existing.data.created_by !== context.userId) {
+    return "forbidden";
+  }
+
+  const { error } = await createAdminClient()
+    .from("transactions")
+    .update({ deleted_at: new Date().toISOString(), deleted_by: context.userId })
+    .eq("id", id)
+    .is("deleted_at", null);
+  return error ? "error" : "trashed";
+}
 
 export async function resolveTransactionContext(
   supabase: ServerClient,
@@ -77,25 +115,13 @@ export async function createSupabaseTransactionGateway(): Promise<TransactionGat
     },
 
     async trash(context, id): Promise<ChangeResult> {
-      const existing = await supabase
-        .from("transactions")
-        .select("id")
-        .eq("id", id)
-        .eq("ledger_id", context.ledgerId)
-        .is("deleted_at", null)
-        .maybeSingle();
-      if (existing.error) return existing.error.code === "500" ? "error" : "forbidden";
-      if (!existing.data) return "forbidden";
-
-      const { error } = await supabase
-        .from("transactions")
-        .update({ deleted_at: new Date().toISOString(), deleted_by: context.userId })
-        .eq("id", id)
-        .eq("ledger_id", context.ledgerId)
-        .is("deleted_at", null);
-      // Soft-deleted rows disappear from SELECT RLS, so PostgREST often
-      // returns count 0 even when the update succeeded.
-      return error ? error.code === "500" ? "error" : "forbidden" : "trashed";
+      const { data, error } = await supabase.rpc("trash_active_transaction", {
+        target_transaction_id: id,
+      });
+      if (!error) return data === "trashed" ? "trashed" : "forbidden";
+      if (isMissingRpc(error)) return trashVisibleTransaction(supabase, context, id);
+      if (error.code === "28000" || error.code === "42501") return "forbidden";
+      return "error";
     },
   };
 }
