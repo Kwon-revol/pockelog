@@ -96,7 +96,7 @@ export function TransactionForm({ categories, initialCategoryId, item, action, t
 
   return (
     <div className="fixed inset-0 z-50 flex items-end bg-slate-950/30 lg:items-stretch lg:justify-end" onMouseDown={(event) => event.target === event.currentTarget && onClose()}>
-      <section aria-label={`내역 ${mode}`} aria-modal="true" className="max-h-[92vh] w-full overflow-x-hidden overflow-y-auto rounded-t-[2rem] bg-white p-6 shadow-2xl lg:max-h-none lg:w-[30rem] lg:rounded-none lg:p-8" role="dialog">
+      <section aria-label={`내역 ${mode}`} aria-modal="true" className="max-h-[92vh] w-full overflow-y-auto rounded-t-[2rem] bg-white p-6 shadow-2xl lg:max-h-none lg:w-[30rem] lg:rounded-none lg:p-8" role="dialog">
         <div className="flex items-center justify-between">
           <div><p className="text-xs font-bold text-emerald-700">{item ? "기록 수정" : "새 기록"}</p><h2 className="mt-1 text-2xl font-black">내역 {mode}</h2></div>
           <button aria-label="닫기" className="size-10 rounded-full bg-slate-100 text-xl" onClick={onClose} type="button">×</button>
@@ -119,9 +119,7 @@ export function TransactionForm({ categories, initialCategoryId, item, action, t
           </fieldset>
 
           <label className="block min-w-0 text-sm font-bold text-slate-700">사용 날짜
-            <span className="relative mt-2 block min-w-0">
-              <input className="block w-full min-w-0 max-w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500" name="occurredOn" onChange={(event) => setOccurredOn(event.target.value)} required type="date" value={occurredOn} />
-            </span>
+            <input className="mt-2 block w-0 min-w-full max-w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500" name="occurredOn" onChange={(event) => setOccurredOn(event.target.value)} required type="date" value={occurredOn} />
             <FieldError errors={state.fieldErrors?.occurredOn} />
           </label>
           <label className="block text-sm font-bold text-slate-700">내용

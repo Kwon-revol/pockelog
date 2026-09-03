@@ -96,6 +96,26 @@ describe("LedgerScreen", () => {
     expect(screen.getByRole("dialog", { name: "내역 추가" })).toBeVisible();
   });
 
+  it("constrains mobile date inputs to the same available width as neighboring fields", async () => {
+    const user = userEvent.setup();
+    render(
+      <LedgerScreen
+        initialData={fixture}
+        createAction={successAction}
+        updateAction={successAction}
+        trashAction={successAction}
+      />,
+    );
+
+    for (const label of ["시작일", "종료일"]) {
+      expect(screen.getByLabelText(label)).toHaveClass("w-0", "min-w-full", "max-w-full");
+    }
+
+    await user.click(screen.getAllByRole("button", { name: "내역 추가" })[0]);
+    expect(within(screen.getByRole("dialog", { name: "내역 추가" })).getByLabelText("사용 날짜"))
+      .toHaveClass("w-0", "min-w-full", "max-w-full");
+  });
+
   it("opens a new expense form with the requested pension category selected", () => {
     const pensionCategoryId = "99999999-9999-4999-8999-999999999999";
     const presetFixture = {
