@@ -17,3 +17,22 @@ body {
   color: var(--foreground);
   font-family: var(--font-sans);
 }
+
+input[type="date"] {
+  box-sizing: border-box;
+  display: block;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+
+input[type="date"]::-webkit-datetime-edit,
+input[type="date"]::-webkit-date-and-time-value {
+  min-width: 0;
+  max-width: 100%;
+}
+
+input[type="date"]::-webkit-calendar-picker-indicator {
+  position: absolute;
+  inset-inline-end: 0.75rem;
+}

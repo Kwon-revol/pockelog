@@ -118,8 +118,10 @@ export function TransactionForm({ categories, initialCategoryId, item, action, t
             <FieldError errors={state.fieldErrors?.type} />
           </fieldset>
 
-          <label className="block text-sm font-bold text-slate-700">사용 날짜
-            <input className="mt-2 block w-full min-w-0 rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500" name="occurredOn" onChange={(event) => setOccurredOn(event.target.value)} required type="date" value={occurredOn} />
+          <label className="block min-w-0 text-sm font-bold text-slate-700">사용 날짜
+            <span className="relative mt-2 block min-w-0">
+              <input className="block w-full min-w-0 max-w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500" name="occurredOn" onChange={(event) => setOccurredOn(event.target.value)} required type="date" value={occurredOn} />
+            </span>
             <FieldError errors={state.fieldErrors?.occurredOn} />
           </label>
           <label className="block text-sm font-bold text-slate-700">내용
