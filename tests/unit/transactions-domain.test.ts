@@ -81,6 +81,7 @@ describe("transaction input", () => {
     };
 
     expect(transactionFormSchema.safeParse({ ...base, amount: "0" }).success).toBe(false);
+    expect(transactionFormSchema.safeParse({ ...base, amount: "12345678901" }).success).toBe(false);
     expect(transactionFormSchema.parse({ ...base, amount: "12500" })).toEqual({
       ...base,
       description: "점심",

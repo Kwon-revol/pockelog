@@ -36,6 +36,13 @@ function todayInSeoul() {
   return `${value("year")}-${value("month")}-${value("day")}`;
 }
 
+const AMOUNT_MAX_DIGITS = 10;
+const won = new Intl.NumberFormat("ko-KR");
+
+function formatAmountDigits(digits: string) {
+  return digits ? won.format(Number(digits)) : "";
+}
+
 function FieldError({ errors }: { errors?: string[] }) {
   return errors?.[0] ? <p className="mt-1 text-xs font-medium text-rose-600">{errors[0]}</p> : null;
 }
@@ -47,14 +54,17 @@ export function TransactionForm({ categories, initialCategoryId, item, action, t
   const [idempotencyKey] = useState(() => crypto.randomUUID());
   const [trashError, setTrashError] = useState<string | null>(null);
   const [trashPending, startTrash] = useTransition();
-  const [amountDisplay, setAmountDisplay] = useState<string>(
-    item?.amount != null ? new Intl.NumberFormat("ko-KR").format(item.amount) : "",
+  const [occurredOn, setOccurredOn] = useState(item?.occurredOn ?? todayInSeoul());
+  const [description, setDescription] = useState(item?.description ?? "");
+  const [memo, setMemo] = useState(item?.memo ?? "");
+  const [amountDisplay, setAmountDisplay] = useState(
+    item?.amount != null ? formatAmountDigits(String(item.amount)) : "",
   );
   const mode = item ? "수정" : "추가";
 
-  const handleAmountChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const digits = e.target.value.replace(/[^0-9]/g, "");
-    setAmountDisplay(digits ? new Intl.NumberFormat("ko-KR").format(Number(digits)) : "");
+  const handleAmountChange = (event: React.ChangeEvent<HTMLInputElement>) => {
+    const digits = event.target.value.replace(/\D/g, "").slice(0, AMOUNT_MAX_DIGITS);
+    setAmountDisplay(formatAmountDigits(digits));
   };
 
   useEffect(() => {
@@ -109,11 +119,11 @@ export function TransactionForm({ categories, initialCategoryId, item, action, t
           </fieldset>
 
           <label className="block text-sm font-bold text-slate-700">사용 날짜
-            <input className="mt-2 w-full max-w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500" defaultValue={item?.occurredOn ?? todayInSeoul()} name="occurredOn" required type="date" />
+            <input className="mt-2 block w-full min-w-0 rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500" name="occurredOn" onChange={(event) => setOccurredOn(event.target.value)} required type="date" value={occurredOn} />
             <FieldError errors={state.fieldErrors?.occurredOn} />
           </label>
           <label className="block text-sm font-bold text-slate-700">내용
-            <input className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500" defaultValue={item?.description} maxLength={100} name="description" placeholder="예: 점심 식사" required />
+            <input className="mt-2 w-full rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500" maxLength={100} name="description" onChange={(event) => setDescription(event.target.value)} placeholder="예: 점심 식사" required value={description} />
             <FieldError errors={state.fieldErrors?.description} />
           </label>
           <label className="block text-sm font-bold text-slate-700">분류
@@ -128,7 +138,7 @@ export function TransactionForm({ categories, initialCategoryId, item, action, t
             <FieldError errors={state.fieldErrors?.amount} />
           </label>
           <label className="block text-sm font-bold text-slate-700">메모 <span className="font-normal text-slate-400">(선택)</span>
-            <textarea className="mt-2 min-h-24 w-full resize-none rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500" defaultValue={item?.memo} maxLength={500} name="memo" placeholder="기억할 내용을 적어두세요." />
+            <textarea className="mt-2 min-h-24 w-full resize-none rounded-2xl border border-slate-200 px-4 py-3 outline-none focus:border-emerald-500" maxLength={500} name="memo" onChange={(event) => setMemo(event.target.value)} placeholder="기억할 내용을 적어두세요." value={memo} />
             <FieldError errors={state.fieldErrors?.memo} />
           </label>
 

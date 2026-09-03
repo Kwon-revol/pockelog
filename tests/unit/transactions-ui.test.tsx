@@ -161,6 +161,35 @@ describe("LedgerScreen", () => {
     expect(screen.queryByRole("dialog", { name: "내역 추가" })).not.toBeInTheDocument();
   });
 
+  it("keeps entered values after required-field validation fails", async () => {
+    const user = userEvent.setup();
+    render(
+      <LedgerScreen
+        initialData={fixture}
+        createAction={async () => ({
+          status: "error",
+          message: "입력한 내용을 확인해 주세요.",
+          fieldErrors: { categoryId: ["분류를 선택해 주세요."] },
+        })}
+        updateAction={successAction}
+        trashAction={successAction}
+      />,
+    );
+
+    await user.click(screen.getAllByRole("button", { name: "내역 추가" })[0]);
+    const dialog = screen.getByRole("dialog", { name: "내역 추가" });
+    await user.clear(within(dialog).getByLabelText("내용"));
+    await user.type(within(dialog).getByLabelText("내용"), "병원비");
+    await user.type(within(dialog).getByRole("textbox", { name: /금액/ }), "516999");
+    await user.type(within(dialog).getByLabelText(/메모/), "진료 영수증");
+    await user.click(within(dialog).getByRole("button", { name: "저장" }));
+
+    await waitFor(() => expect(within(dialog).getByRole("alert")).toHaveTextContent("입력한 내용을 확인해 주세요."));
+    expect(within(dialog).getByLabelText("내용")).toHaveValue("병원비");
+    expect(within(dialog).getByRole("textbox", { name: /금액/ })).toHaveValue("516,999");
+    expect(within(dialog).getByLabelText(/메모/)).toHaveValue("진료 영수증");
+  });
+
   it("resets the category when the transaction type changes", async () => {
     const user = userEvent.setup();
     render(
@@ -240,7 +269,7 @@ describe("LedgerScreen", () => {
 
     const dialog = screen.getByRole("dialog", { name: "내역 수정" });
     expect(within(dialog).getByLabelText("내용")).toHaveValue("세금 화면 연금저축");
-    expect(within(dialog).getByRole("textbox", { name: /금액/ })).toHaveValue("500000");
+    expect(within(dialog).getByRole("textbox", { name: /금액/ })).toHaveValue("500,000");
     expect(within(dialog).getByLabelText(/메모/)).toHaveValue("자동 편집 연결");
   });
 

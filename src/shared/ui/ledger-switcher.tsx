@@ -27,7 +27,7 @@ export function LedgerSwitcher({
         현재 장부
         <select
           aria-label="현재 장부"
-          className={`rounded-xl border border-emerald-100 bg-white px-3 py-2 font-bold text-slate-900 outline-none focus:border-emerald-500 ${compact ? "min-w-0 flex-1 text-xs" : "mt-1 w-full text-sm"}`}
+          className={`rounded-xl border border-emerald-100 bg-white px-3 py-2 font-bold text-slate-900 outline-none focus:border-emerald-500 ${compact ? "w-full max-w-[9rem] min-w-0 text-xs" : "mt-1 w-full text-sm"}`}
           disabled={pending}
           onChange={(event) => {
             const next = event.target.value;
