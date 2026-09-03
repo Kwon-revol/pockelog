@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 
 import { PRODUCT_DESCRIPTION, PRODUCT_NAME } from "@/shared/config/product";
+import { ServiceWorkerRegistration } from "@/shared/pwa/service-worker-registration";
 
 import "./globals.css";
 
@@ -29,7 +30,10 @@ export default function RootLayout({
 }: Readonly<{ children: React.ReactNode }>) {
   return (
     <html lang="ko" className="h-full antialiased">
-      <body className="flex min-h-full flex-col">{children}</body>
+      <body className="flex min-h-full flex-col">
+        {children}
+        <ServiceWorkerRegistration />
+      </body>
     </html>
   );
 }
