@@ -11,7 +11,10 @@ import { getTaxRule } from "@/features/tax/rules";
 export async function GET(request: NextRequest) {
   const yearParam = request.nextUrl.searchParams.get("year");
   const yearNum = yearParam !== null ? Number(yearParam) : NaN;
-  const validYear = Number.isInteger(yearNum) && getTaxRule(yearNum) !== null;
+  const validYear = yearParam !== null
+    && /^\d{4}$/.test(yearParam)
+    && Number.isInteger(yearNum)
+    && getTaxRule(yearNum) !== null;
   const cursor = validYear
     ? decodeTaxCursor(request.nextUrl.searchParams.get("cursor"), yearNum)
     : null;

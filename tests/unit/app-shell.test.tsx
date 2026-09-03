@@ -4,8 +4,17 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { AppShell } from "@/shared/ui/app-shell";
 
+const navigationState = vi.hoisted(() => ({ pathname: "/ledger" }));
+
+vi.mock("next/navigation", () => ({
+  usePathname: () => navigationState.pathname,
+}));
+
 describe("AppShell", () => {
-  afterEach(cleanup);
+  afterEach(() => {
+    cleanup();
+    navigationState.pathname = "/ledger";
+  });
 
   it("shows the current ledger, user, and the four primary destinations", () => {
     render(
@@ -27,6 +36,48 @@ describe("AppShell", () => {
 
     for (const label of ["가계부", "통계", "세금", "설정"]) {
       expect(screen.getAllByRole("link", { name: label }).length).toBeGreaterThan(0);
+    }
+  });
+
+  it("marks the current destination as selected in mobile and desktop navigation", () => {
+    navigationState.pathname = "/tax-goals";
+    render(
+      <AppShell
+        currentLedger={{ id: "11111111-1111-4111-8111-111111111111", name: "권님의 장부", kind: "personal", role: "owner" }}
+        ledgers={[{ id: "11111111-1111-4111-8111-111111111111", name: "권님의 장부", kind: "personal", role: "owner" }]}
+        pendingInvitationCount={0}
+        switchLedgerAction={async () => ({ status: "success" })}
+        userName="권혁"
+      >
+        <h1>세금 내용</h1>
+      </AppShell>,
+    );
+
+    for (const link of screen.getAllByRole("link", { name: "세금" })) {
+      expect(link).toHaveAttribute("aria-current", "page");
+      expect(link).toHaveClass("bg-emerald-50", "text-emerald-800");
+    }
+    for (const link of screen.getAllByRole("link", { name: "가계부" })) {
+      expect(link).not.toHaveAttribute("aria-current");
+    }
+  });
+
+  it("keeps a parent destination selected on nested routes", () => {
+    navigationState.pathname = "/settings/trash";
+    render(
+      <AppShell
+        currentLedger={{ id: "11111111-1111-4111-8111-111111111111", name: "권님의 장부", kind: "personal", role: "owner" }}
+        ledgers={[{ id: "11111111-1111-4111-8111-111111111111", name: "권님의 장부", kind: "personal", role: "owner" }]}
+        pendingInvitationCount={0}
+        switchLedgerAction={async () => ({ status: "success" })}
+        userName="권혁"
+      >
+        <h1>휴지통</h1>
+      </AppShell>,
+    );
+
+    for (const link of screen.getAllByRole("link", { name: "설정" })) {
+      expect(link).toHaveAttribute("aria-current", "page");
     }
   });
 
