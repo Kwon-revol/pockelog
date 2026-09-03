@@ -21,6 +21,22 @@ npm run dev
 
 실제 키가 들어 있는 `.env*` 파일은 Git에 커밋하지 않습니다.
 
+## 앱 설치(PWA)
+
+운영 사이트를 HTTPS로 열면 Android와 PC의 Chromium 계열 브라우저에서 브라우저가
+제공하는 설치 메뉴로 PockeLog를 설치할 수 있습니다. iPhone과 iPad에서는 Safari의
+공유 메뉴에서 `홈 화면에 추가`를 선택합니다. 앱 내부에는 별도 설치 버튼을 두지 않습니다.
+
+설치 앱은 standalone 창으로 `/ledger`에서 시작합니다. 공개 앱 아이콘과 Next.js의
+버전이 붙은 정적 번들만 오프라인 캐시에 저장하며, 로그인·가계부·통계·설정·API 응답은
+캐시하지 않으므로 인터넷 연결이 필요합니다.
+
+아이콘 원본을 변경한 뒤 다음 명령으로 설치 아이콘을 다시 생성합니다.
+
+```bash
+npm run icons:generate
+```
+
 ## Supabase 초기 설정
 
 Docker는 필요하지 않습니다. 새 Supabase 프로젝트의 SQL Editor에서
