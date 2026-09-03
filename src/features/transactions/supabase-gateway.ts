@@ -77,16 +77,25 @@ export async function createSupabaseTransactionGateway(): Promise<TransactionGat
     },
 
     async trash(context, id): Promise<ChangeResult> {
-      const { count, error } = await supabase
+      const existing = await supabase
         .from("transactions")
-        .update(
-          { deleted_at: new Date().toISOString(), deleted_by: context.userId },
-          { count: "exact" },
-        )
+        .select("id")
+        .eq("id", id)
+        .eq("ledger_id", context.ledgerId)
+        .is("deleted_at", null)
+        .maybeSingle();
+      if (existing.error) return existing.error.code === "500" ? "error" : "forbidden";
+      if (!existing.data) return "forbidden";
+
+      const { error } = await supabase
+        .from("transactions")
+        .update({ deleted_at: new Date().toISOString(), deleted_by: context.userId })
         .eq("id", id)
         .eq("ledger_id", context.ledgerId)
         .is("deleted_at", null);
-      return !error && count === 1 ? "trashed" : error?.code === "500" ? "error" : "forbidden";
+      // Soft-deleted rows disappear from SELECT RLS, so PostgREST often
+      // returns count 0 even when the update succeeded.
+      return error ? error.code === "500" ? "error" : "forbidden" : "trashed";
     },
   };
 }
