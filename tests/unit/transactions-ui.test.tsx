@@ -70,10 +70,17 @@ describe("LedgerScreen", () => {
   beforeEach(() => {
     vi.stubGlobal("IntersectionObserver", FakeIntersectionObserver);
     vi.stubGlobal("confirm", vi.fn(() => true));
+    Object.defineProperty(HTMLDialogElement.prototype, "showModal", {
+      configurable: true,
+      value: vi.fn(function showModal(this: HTMLDialogElement) {
+        this.setAttribute("open", "");
+      }),
+    });
   });
 
   afterEach(() => {
     cleanup();
+    delete (HTMLDialogElement.prototype as { showModal?: () => void }).showModal;
     vi.unstubAllGlobals();
   });
 
@@ -94,6 +101,32 @@ describe("LedgerScreen", () => {
     expect(screen.getAllByRole("button", { name: /점심/ })).toHaveLength(2);
     await user.click(screen.getAllByRole("button", { name: "내역 추가" })[0]);
     expect(screen.getByRole("dialog", { name: "내역 추가" })).toBeVisible();
+  });
+
+  it("opens a native modal and prevents its scroll from reaching the ledger", async () => {
+    const user = userEvent.setup();
+    render(
+      <LedgerScreen
+        initialData={fixture}
+        createAction={successAction}
+        updateAction={successAction}
+        trashAction={successAction}
+      />,
+    );
+
+    await user.click(screen.getAllByRole("button", { name: "내역 추가" })[0]);
+
+    const dialog = screen.getByRole("dialog", { name: "내역 추가" });
+    const panel = dialog.querySelector("section");
+    expect(dialog.tagName).toBe("DIALOG");
+    expect(HTMLDialogElement.prototype.showModal).toHaveBeenCalledOnce();
+    expect(document.body.style.position).toBe("fixed");
+    expect(document.body.style.overflow).toBe("hidden");
+    expect(panel).toHaveClass("overscroll-contain", "max-h-[92dvh]");
+
+    await user.click(within(dialog).getByRole("button", { name: "닫기" }));
+    expect(document.body.style.position).toBe("");
+    expect(document.body.style.overflow).toBe("");
   });
 
   it("constrains mobile date inputs to the same available width as neighboring fields", async () => {
