@@ -12,6 +12,10 @@ import {
   LedgerSettingsForm,
   type SettingsFormAction,
 } from "@/features/settings/ledger-settings-form";
+import {
+  StatisticsGroupManager,
+  type StatisticsGroupManagerActions,
+} from "@/features/settings/statistics-group-manager";
 import type { SettingsPageData } from "@/features/settings/types";
 import { PasswordChangeForm } from "@/features/profile/password-change-form";
 import { ProfileForm } from "@/features/profile/profile-form";
@@ -35,6 +39,7 @@ export function SettingsScreen({
   changePasswordAction,
   sharedLedgerData,
   sharedLedgerActions,
+  statisticsGroupActions,
 }: {
   data: SettingsPageData;
   updateLedgerAction: SettingsFormAction;
@@ -48,6 +53,7 @@ export function SettingsScreen({
   changePasswordAction: ProfileFormAction;
   sharedLedgerData?: SharedLedgerPageData;
   sharedLedgerActions?: SharedLedgerManagerActions;
+  statisticsGroupActions: StatisticsGroupManagerActions;
 }) {
   return (
     <div className="space-y-7">
@@ -57,6 +63,7 @@ export function SettingsScreen({
       {!data.isOwner ? <p className="rounded-2xl border border-amber-200 bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">장부 소유자만 설정을 변경할 수 있어요. 현재 장부의 설정은 읽기 전용으로 표시됩니다.</p> : null}
       <LedgerSettingsForm action={updateLedgerAction} isOwner={data.isOwner} ledger={data.ledger} />
       <CategoryManager activeAction={setCategoryActiveAction} categories={data.categories} createAction={createCategoryAction} isOwner={data.isOwner} moveAction={moveCategoryAction} updateAction={updateCategoryAction} />
+      <StatisticsGroupManager actions={statisticsGroupActions} available={data.statisticsGroupsAvailable} categories={data.categories} groups={data.statisticsGroups} isOwner={data.isOwner} />
       {sharedLedgerData && sharedLedgerActions ? <SharedLedgerManager actions={sharedLedgerActions} data={sharedLedgerData} /> : null}
       {data.isOwner ? (
         <section className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">

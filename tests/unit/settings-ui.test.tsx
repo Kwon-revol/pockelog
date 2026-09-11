@@ -10,11 +10,36 @@ const data: SettingsPageData = {
   ledger: { id: "ledger-1", name: "내 장부", periodStartDay: 10 },
   isOwner: true,
   categories: [
-    { id: "11111111-1111-4111-8111-111111111111", type: "expense", name: "식비", color: "#F97316", sortOrder: 0, isActive: true },
-    { id: "22222222-2222-4222-8222-222222222222", type: "expense", name: "교통", color: "#3B82F6", sortOrder: 1, isActive: true },
-    { id: "33333333-3333-4333-8333-333333333333", type: "expense", name: "예전 분류", color: "#64748B", sortOrder: 2, isActive: false },
-    { id: "44444444-4444-4444-8444-444444444444", type: "income", name: "급여", color: "#10B981", sortOrder: 0, isActive: true },
+    { id: "11111111-1111-4111-8111-111111111111", type: "expense", name: "식비", color: "#F97316", sortOrder: 0, isActive: true, statisticsGroupId: null },
+    { id: "22222222-2222-4222-8222-222222222222", type: "expense", name: "교통", color: "#3B82F6", sortOrder: 1, isActive: true, statisticsGroupId: null },
+    { id: "33333333-3333-4333-8333-333333333333", type: "expense", name: "예전 분류", color: "#64748B", sortOrder: 2, isActive: false, statisticsGroupId: null },
+    { id: "55555555-5555-4555-8555-555555555555", type: "expense", name: "주거비", color: "#8B5CF6", sortOrder: 3, isActive: true, statisticsGroupId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" },
+    { id: "66666666-6666-4666-8666-666666666666", type: "expense", name: "통신비", color: "#EC4899", sortOrder: 4, isActive: true, statisticsGroupId: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa" },
+    { id: "77777777-7777-4777-8777-777777777777", type: "expense", name: "연금저축", color: "#10B981", sortOrder: 5, isActive: true, statisticsGroupId: null },
+    { id: "44444444-4444-4444-8444-444444444444", type: "income", name: "급여", color: "#10B981", sortOrder: 0, isActive: true, statisticsGroupId: null },
   ],
+  statisticsGroups: [
+    {
+      id: "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      type: "expense",
+      name: "고정지출",
+      color: "#64748B",
+      sortOrder: 0,
+      categoryIds: [
+        "55555555-5555-4555-8555-555555555555",
+        "66666666-6666-4666-8666-666666666666",
+      ],
+    },
+    {
+      id: "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      type: "expense",
+      name: "유동지출",
+      color: "#F97316",
+      sortOrder: 1,
+      categoryIds: [],
+    },
+  ],
+  statisticsGroupsAvailable: true,
 };
 
 const successFormAction = async (): Promise<SettingsActionState> => ({ status: "success" });
@@ -35,6 +60,12 @@ function renderScreen(overrides: Partial<React.ComponentProps<typeof SettingsScr
       profileData={profileData}
       updateProfileAction={successProfileAction}
       changePasswordAction={successProfileAction}
+      statisticsGroupActions={{
+        createAction: successFormAction,
+        updateAction: async () => ({ status: "success" }),
+        deleteAction: successChangeAction,
+        moveAction: successChangeAction,
+      }}
       {...overrides}
     />,
   );
@@ -135,5 +166,145 @@ describe("SettingsScreen", () => {
     await waitFor(() => expect(hide).toBeDisabled());
     finish({ status: "success", message: "분류를 숨겼어요." });
     expect(await screen.findByRole("status")).toHaveTextContent("분류를 숨겼어요.");
+  });
+
+  it("shows groups, unassigned categories, and lets the owner create a group", async () => {
+    const user = userEvent.setup();
+    const createStatisticsGroupAction = vi.fn(successFormAction);
+    renderScreen({
+      statisticsGroupActions: {
+        createAction: createStatisticsGroupAction,
+        updateAction: async () => ({ status: "success" }),
+        deleteAction: successChangeAction,
+        moveAction: successChangeAction,
+      },
+    });
+
+    const region = screen.getByRole("region", { name: "통계 그룹 관리" });
+    expect(within(region).getByText("고정지출")).toBeVisible();
+    expect(within(region).getByText(/주거비/)).toBeVisible();
+    expect(within(region).getByText(/통신비/)).toBeVisible();
+    expect(within(region).getByText(/그룹 미지정.*식비/)).toBeVisible();
+
+    await user.click(within(region).getByRole("button", { name: "통계 그룹 추가" }));
+    expect(within(region).getAllByRole("button", { name: /색상 선택/ })).toHaveLength(6);
+    await user.type(within(region).getByLabelText("그룹 이름"), "저축");
+    await user.click(within(region).getByLabelText("연금저축"));
+    await user.click(within(region).getByRole("button", { name: "그룹 저장" }));
+
+    await waitFor(() => expect(createStatisticsGroupAction).toHaveBeenCalled());
+  });
+
+  it("warns before moving a category and labels hidden categories in the form", async () => {
+    const user = userEvent.setup();
+    renderScreen();
+    const region = screen.getByRole("region", { name: "통계 그룹 관리" });
+
+    await user.click(within(region).getByRole("button", { name: "통계 그룹 추가" }));
+    await user.click(within(region).getByLabelText("주거비"));
+
+    expect(within(region).getByText("저장하면 기존 그룹에서 이 그룹으로 이동해요.")).toBeVisible();
+    expect(within(region).getByLabelText("예전 분류")).toBeVisible();
+    expect(within(region).getByText("숨김")).toBeVisible();
+  });
+
+  it("lets the owner edit, reorder, and confirm deletion", async () => {
+    const user = userEvent.setup();
+    const moveAction = vi.fn(successChangeAction);
+    const deleteAction = vi.fn(successChangeAction);
+    renderScreen({
+      statisticsGroupActions: {
+        createAction: successFormAction,
+        updateAction: async () => ({ status: "success" }),
+        deleteAction,
+        moveAction,
+      },
+    });
+    const region = screen.getByRole("region", { name: "통계 그룹 관리" });
+
+    await user.click(within(region).getByRole("button", { name: "고정지출 수정" }));
+    expect(within(region).getByLabelText("그룹 이름")).toHaveValue("고정지출");
+    expect(within(region).getByLabelText("주거비")).toBeChecked();
+    await user.click(within(region).getByRole("button", { name: "편집 취소" }));
+
+    await user.click(within(region).getByRole("button", { name: "고정지출 아래로 이동" }));
+    await waitFor(() => expect(moveAction).toHaveBeenCalledWith(
+      "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+      "down",
+      "expense",
+      [
+        "aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa",
+        "bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb",
+      ],
+    ));
+
+    const deleteButton = within(region).getByRole("button", { name: "고정지출 삭제" });
+    await waitFor(() => expect(deleteButton).toBeEnabled());
+    await user.click(deleteButton);
+    expect(confirm).toHaveBeenCalledWith("고정지출 그룹을 삭제할까요? 상세 분류와 거래는 유지됩니다.");
+    await waitFor(() => expect(deleteAction).toHaveBeenCalledWith("aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa"));
+  });
+
+  it("keeps income and expense groups on separate tabs", async () => {
+    const user = userEvent.setup();
+    renderScreen();
+    const region = screen.getByRole("region", { name: "통계 그룹 관리" });
+
+    await user.click(within(region).getByRole("button", { name: "수입 그룹" }));
+
+    expect(within(region).getByText("그룹 미지정: 급여")).toBeVisible();
+    expect(within(region).queryByText("고정지출")).not.toBeInTheDocument();
+    await user.click(within(region).getByRole("button", { name: "통계 그룹 추가" }));
+    expect(within(region).getByLabelText("급여")).toBeVisible();
+    expect(within(region).queryByLabelText("식비")).not.toBeInTheDocument();
+  });
+
+  it("keeps a failed inline form open and closes it after a successful save", async () => {
+    const user = userEvent.setup();
+    const createAction = vi
+      .fn()
+      .mockResolvedValueOnce({ status: "error", message: "같은 이름의 통계 그룹이 있어요." })
+      .mockResolvedValueOnce({ status: "success", message: "통계 그룹을 추가했어요." });
+    renderScreen({
+      statisticsGroupActions: {
+        createAction,
+        updateAction: async () => ({ status: "success" }),
+        deleteAction: successChangeAction,
+        moveAction: successChangeAction,
+      },
+    });
+    const region = screen.getByRole("region", { name: "통계 그룹 관리" });
+
+    await user.click(within(region).getByRole("button", { name: "통계 그룹 추가" }));
+    await user.type(within(region).getByLabelText("그룹 이름"), "고정지출");
+    await user.click(within(region).getByRole("button", { name: "그룹 저장" }));
+    expect(await within(region).findByRole("alert")).toHaveTextContent("같은 이름의 통계 그룹이 있어요.");
+    expect(within(region).getByLabelText("그룹 이름")).toHaveValue("고정지출");
+
+    await user.click(within(region).getByRole("button", { name: "그룹 저장" }));
+    await waitFor(() => expect(within(region).queryByLabelText("그룹 이름")).not.toBeInTheDocument());
+  });
+
+  it("shows group membership to members without owner controls", () => {
+    renderScreen({ data: { ...data, isOwner: false } });
+    const region = screen.getByRole("region", { name: "통계 그룹 관리" });
+
+    expect(within(region).getByText("고정지출")).toBeVisible();
+    expect(within(region).getByText(/주거비/)).toBeVisible();
+    expect(within(region).queryByRole("button", { name: "통계 그룹 추가" })).not.toBeInTheDocument();
+    expect(within(region).queryByRole("button", { name: "고정지출 수정" })).not.toBeInTheDocument();
+    expect(within(region).queryByRole("button", { name: "고정지출 삭제" })).not.toBeInTheDocument();
+    expect(within(region).queryByRole("button", { name: "고정지출 아래로 이동" })).not.toBeInTheDocument();
+  });
+
+  it("shows only the migration notice when statistics group schema is unavailable", () => {
+    renderScreen({
+      data: { ...data, statisticsGroups: [], statisticsGroupsAvailable: false },
+    });
+    const region = screen.getByRole("region", { name: "통계 그룹 관리" });
+
+    expect(region).toHaveTextContent("Supabase 통계 그룹 설정을 먼저 적용해 주세요.");
+    expect(within(region).queryByText("고정지출")).not.toBeInTheDocument();
+    expect(within(region).queryByRole("button")).not.toBeInTheDocument();
   });
 });
