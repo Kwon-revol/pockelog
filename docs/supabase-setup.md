@@ -251,20 +251,58 @@ select
 npm run test:e2e -- --project=desktop-chromium --project=mobile-chromium tests/e2e/settings.spec.ts
 ```
 
-## 통계 그룹 마이그레이션 적용
+## 통계 그룹 마이그레이션 적용 및 배포
 
-통계 그룹 앱 코드 배포 전에 `supabase/migrations/202609110009_statistics_groups.sql`을
-SQL Editor에서 한 번 실행한다. 기존 `202609030009_trash_active_transaction.sql`과
-파일명 끝의 `009`가 같지만 전체 타임스탬프가 다른 별도 마이그레이션이다. 기존 마이그레이션을
-대체하거나 건너뛰지 않고 `202609030009_trash_active_transaction.sql` 다음에 적용한다.
+통계 그룹 앱 코드는 `supabase/migrations/202609110009_statistics_groups.sql`을 먼저 적용한 뒤에만
+배포한다. 파일명 끝의 번호 기준 전체 적용 순서는 다음과 같다. 기존
+`202609030009_trash_active_transaction.sql`은 별도 보완 마이그레이션이므로 빼거나 대체하지 않고,
+마지막으로 통계 그룹 009를 적용한다.
 
-1. 001~008 및 `202609030009_trash_active_transaction.sql`이 적용된 전용 개발 프로젝트에서
-   통계 그룹 마이그레이션을 한 번 실행한다.
-2. 아래 스키마 확인 쿼리와 권한 확인 쿼리의 모든 결과가 `true`인지 확인한다.
-3. 소유자 계정의 그룹 저장·정렬·삭제와 일반 구성원의 조회·변경 거부를 확인한다.
-   그룹 삭제 전후 상세 분류와 거래가 유지되고 연결만 해제되는지도 확인한다.
-4. 운영 프로젝트를 확인한 뒤 같은 마이그레이션을 한 번 적용하고 동일한 확인 쿼리를 실행한다.
-5. 검증이 끝난 다음 통계 그룹 앱 코드를 배포하고 소유자·일반 구성원의 설정과 통계 화면을 확인한다.
+1. `202608260001_initial_auth_and_ledgers.sql`
+2. `202608260002_transactions.sql`
+3. `202608260003_statistics.sql`
+4. `202608270004_settings.sql`
+5. `202608270005_shared_ledgers.sql`
+6. `202608280006_pension_tax_credit.sql`
+7. `202609010007_transaction_trash.sql`
+8. `202609020008_account_profile_settings.sql`
+9. `202609030009_trash_active_transaction.sql`
+10. `202609110009_statistics_groups.sql`
+
+각 파일은 대상 프로젝트에서 한 번만 실행한다. `relation already exists` 같은 결과가 나오면 전체
+파일을 다시 실행하지 말고 적용 기록과 아래 확인 쿼리로 실제 적용 상태를 먼저 확인한다.
+
+### 개발 프로젝트 순서
+
+1. 전용 개발 프로젝트의 ref, 최근 백업 또는 복구 가능 지점을 기록하고 위 001~009 순서가 모두
+   적용됐는지 확인한다.
+2. 마지막 `202609110009_statistics_groups.sql`을 SQL Editor에서 한 번 실행한다.
+3. 아래 스키마·권한 확인 쿼리의 모든 결과가 `true`인지 확인한다.
+4. 소유자 계정으로 그룹 추가·정렬·삭제를 확인하고, 삭제 전후 상세 분류와 거래가 유지되며 연결만
+   해제되는지 확인한다. 일반 구성원은 그룹 구성과 통계를 볼 수 있지만 변경 버튼과 변경 권한이
+   없어야 한다.
+5. 파괴적 E2E가 꼭 필요할 때만 개발 프로젝트에서 `allow_destructive_e2e`를 잠시 `true`로 바꾸고,
+   ref·URL·키를 명시한 상태로 아래 PC·모바일 명령을 실행한다. 종료 직후 값을 다시 `false`로 바꾼다.
+
+```bash
+npm run test:e2e -- --project=desktop-chromium --project=mobile-chromium tests/e2e/settings.spec.ts tests/e2e/statistics.spec.ts
+```
+
+### 운영 프로젝트와 코드 배포 순서
+
+1. 운영 프로젝트의 이름·ref와 백업 또는 복구 가능 지점을 다시 확인하고, 개발 프로젝트와 혼동하지
+   않았는지 기록한다. 운영에서는 `allow_destructive_e2e`를 항상 `false`로 유지한다.
+2. 아직 통계 그룹 앱 코드를 배포하지 않은 상태에서 위 순서의 미적용 파일을 번호 순서대로 적용하고,
+   마지막 `202609110009_statistics_groups.sql`을 한 번 실행한다.
+3. 아래 스키마·권한 확인 쿼리를 실행한다. 결과가 하나라도 `true`가 아니면 코드를 배포하지 않는다.
+4. `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_PUBLISHABLE_KEY`,
+   `SUPABASE_SECRET_KEY`, `NEXT_PUBLIC_APP_URL`이 운영 대상과 도메인을 가리키는지 확인한 뒤 현재
+   통계 그룹 코드를 새 Vercel Production 빌드로 배포한다.
+5. 배포 사이트에서 소유자가 지출·수입 그룹을 각각 열어 상세 분류를 하나씩 연결하고, 통계 상세의
+   그룹 합계와 펼친 하위 분류를 확인한다. 그룹 삭제 뒤 거래와 상세 분류가 남는지도 비파괴적인
+   테스트 데이터로 확인한다.
+6. 일반 구성원 계정으로 같은 공동 장부를 열어 그룹 구성과 통계가 보이지만 추가·수정·삭제·순서
+   변경 버튼이 없는지 확인한다.
 
 ```sql
 select

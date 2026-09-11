@@ -49,6 +49,44 @@ async function selectVisibleLedger(page: Page, label: string) {
   await expect(selector.locator("option:checked")).toHaveText(label);
 }
 
+async function createExpenseCategory(page: Page, name: string) {
+  await page.getByRole("button", { name: "분류 추가" }).click();
+  const dialog = page.getByRole("dialog", { name: "지출 분류 추가" });
+  await dialog.getByLabel("분류 이름").fill(name);
+  await dialog.getByRole("button", { name: "분류 추가" }).click();
+  await expect(dialog).toBeHidden();
+}
+
+async function createExpenseGroup(page: Page, name: string, categoryNames: string[]) {
+  const manager = page.getByRole("region", { name: "통계 그룹 관리" });
+  await manager.getByRole("button", { name: "통계 그룹 추가" }).click();
+  await manager.getByLabel("그룹 이름").fill(name);
+  await manager.getByRole("button", { name: "#3B82F6 색상 선택" }).click();
+  for (const categoryName of categoryNames) {
+    await manager.getByLabel(categoryName, { exact: true }).check();
+  }
+  await manager.getByRole("button", { name: "그룹 저장" }).click();
+  await expect(manager.getByRole("status")).toContainText("통계 그룹을 추가했어요");
+}
+
+async function addExpense(
+  page: Page,
+  testInfo: TestInfo,
+  description: string,
+  category: string,
+  amount: string,
+) {
+  await page.goto("/ledger");
+  const buttons = page.getByRole("button", { name: /내역 추가/ });
+  await (testInfo.project.name === "mobile-chromium" ? buttons.last() : buttons.first()).click();
+  const dialog = page.getByRole("dialog", { name: "내역 추가" });
+  await dialog.getByLabel("내용").fill(description);
+  await dialog.getByLabel("분류").selectOption({ label: category });
+  await dialog.getByLabel("금액").fill(amount);
+  await dialog.getByRole("button", { name: "저장" }).click();
+  await expect(dialog).toBeHidden();
+}
+
 function uniqueFor(testInfo: TestInfo) {
   const project = testInfo.project.name === "mobile-chromium" ? "m" : "d";
   return `${project}${Date.now()}${testInfo.workerIndex}`;
@@ -230,6 +268,86 @@ test.describe("호스팅된 개발 Supabase 설정", () => {
       await expect(page.getByRole("region", { name: "정산 기간별 통계" }).getByRole("link").first()).toContainText("10일");
     } finally {
       await deleteE2EUsersByEmail([email]);
+    }
+  });
+
+  test("공동 장부 구성원은 통계 그룹을 읽기 전용으로 보고 소유자만 관리한다", async ({ browser }, testInfo) => {
+    test.setTimeout(180_000);
+    await verifyHostedSupabaseE2ESafety();
+    const unique = uniqueFor(testInfo);
+    const owner = {
+      handle: `sgo_${unique}`,
+      name: "그룹 소유자",
+      email: `statistics_group_owner_${unique}@example.com`,
+      phone: "010-3030-4040",
+    };
+    const member = {
+      handle: `sgm_${unique}`,
+      name: "그룹 구성원",
+      email: `statistics_group_member_${unique}@example.com`,
+      phone: "010-5050-6060",
+    };
+    const ledgerName = `통계 그룹 공동 장부 ${unique.slice(-5)}`;
+    const mobile = testInfo.project.name === "mobile-chromium";
+    const contextOptions = {
+      baseURL: "http://127.0.0.1:3000",
+      viewport: mobile ? { width: 393, height: 851 } : { width: 1280, height: 720 },
+      isMobile: mobile,
+      hasTouch: mobile,
+    };
+    const ownerContext: BrowserContext = await browser.newContext(contextOptions);
+    const memberContext: BrowserContext = await browser.newContext(contextOptions);
+    const ownerPage = await ownerContext.newPage();
+    const memberPage = await memberContext.newPage();
+
+    try {
+      await signUp(ownerPage, owner);
+      await signUp(memberPage, member);
+
+      await ownerPage.goto("/settings");
+      await ownerPage.getByLabel("새 장부 이름").fill(ledgerName);
+      await ownerPage.getByRole("button", { name: "공동 장부 만들기" }).click();
+      await expect(ownerPage.getByRole("status")).toContainText("공동 장부를 만들었어요");
+      await ownerPage.reload();
+      await createExpenseCategory(ownerPage, "E2E 주거비");
+      await createExpenseCategory(ownerPage, "E2E 통신비");
+      await createExpenseCategory(ownerPage, "E2E 식비");
+      await createExpenseGroup(ownerPage, "E2E 고정지출", ["E2E 주거비", "E2E 통신비"]);
+      await addExpense(ownerPage, testInfo, "E2E 공동 주거비", "E2E 주거비", "100000");
+      await addExpense(ownerPage, testInfo, "E2E 공동 통신비", "E2E 통신비", "50000");
+
+      await ownerPage.goto("/settings");
+      await ownerPage.getByLabel("초대할 아이디 또는 이메일").fill(member.handle);
+      await ownerPage.getByRole("button", { name: "초대하기" }).click();
+      await expect(ownerPage.getByRole("status")).toContainText("초대를 보냈어요");
+
+      await memberPage.goto("/settings");
+      await memberPage.getByRole("button", { name: `${ledgerName} 초대 수락` }).click();
+      await expect(memberPage.getByRole("status")).toContainText("초대를 수락했어요");
+      await memberPage.reload();
+      await selectVisibleLedger(memberPage, `공동 · ${ledgerName}`);
+      await memberPage.goto("/statistics");
+      await memberPage.getByRole("region", { name: "정산 기간별 통계" }).getByRole("link").first().click();
+      const breakdown = memberPage.getByRole("region", { name: "분류별 지출 비율" });
+      await expect(breakdown.getByRole("button", { name: /E2E 고정지출.*150,000원/ })).toBeVisible();
+      await memberPage.goto("/settings");
+
+      const manager = memberPage.getByRole("region", { name: "통계 그룹 관리" });
+      await expect(manager.getByText("E2E 고정지출", { exact: true })).toBeVisible();
+      await expect(manager.getByText(/E2E 주거비.*E2E 통신비/)).toBeVisible();
+      await expect(manager.getByRole("button", { name: "통계 그룹 추가" })).toHaveCount(0);
+      await expect(manager.getByRole("button", { name: "E2E 고정지출 수정" })).toHaveCount(0);
+      await expect(manager.getByRole("button", { name: "E2E 고정지출 삭제" })).toHaveCount(0);
+    } finally {
+      try {
+        await ownerContext.close();
+      } finally {
+        try {
+          await memberContext.close();
+        } finally {
+          await deleteE2EUsersByEmail([owner.email, member.email]);
+        }
+      }
     }
   });
 });
