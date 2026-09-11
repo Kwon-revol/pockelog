@@ -109,7 +109,7 @@ describe("SettingsScreen", () => {
     renderScreen();
 
     expect(screen.getByRole("button", { name: "식비 위로 이동" })).toBeDisabled();
-    expect(screen.getByRole("button", { name: "교통 아래로 이동" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "연금저축 아래로 이동" })).toBeDisabled();
     await user.click(screen.getByText("숨긴 분류 1개"));
     expect(screen.getByText("예전 분류")).toBeVisible();
     expect(screen.getByRole("button", { name: "예전 분류 다시 표시" })).toBeVisible();

@@ -49,6 +49,7 @@ function StatisticsGroupForm({
   action: SettingsFormAction;
   onClose(): void;
 }) {
+  const [name, setName] = useState(group?.name ?? "");
   const [selectedIds, setSelectedIds] = useState(() => new Set(group?.categoryIds ?? []));
   const [color, setColor] = useState(group?.color ?? colorPresets[0]);
   const [state, formAction] = useActionState(
@@ -98,7 +99,7 @@ function StatisticsGroupForm({
         <input name="type" type="hidden" value={type} />
         <label className="block text-sm font-bold text-slate-700">
           그룹 이름
-          <input className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-emerald-500" defaultValue={group?.name ?? ""} maxLength={30} name="name" required />
+          <input className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-emerald-500" maxLength={30} name="name" onChange={(event) => setName(event.target.value)} required value={name} />
           {state.fieldErrors?.name?.[0] ? <span className="mt-1 block text-xs text-rose-600">{state.fieldErrors.name[0]}</span> : null}
         </label>
         <fieldset>
