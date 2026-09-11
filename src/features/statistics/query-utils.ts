@@ -1,6 +1,9 @@
 import type {
   CategorySummary,
+  GroupedCategoryStatisticsRow,
   PeriodSummary,
+  StatisticsBreakdownItem,
+  StatisticsGroupSummary,
 } from "@/features/statistics/types";
 import type { LedgerPeriod } from "@/features/transactions/period";
 
@@ -64,4 +67,59 @@ export function toCategorySummaries(
       || left.sortOrder - right.sortOrder
       || left.categoryId.localeCompare(right.categoryId),
     );
+}
+
+function toCategoryRow(row: GroupedCategoryStatisticsRow): CategoryStatisticsRow {
+  return {
+    category_id: row.category_id,
+    category_name: row.category_name,
+    category_color: row.category_color,
+    sort_order: row.category_sort_order,
+    amount_total: row.amount_total,
+  };
+}
+
+export function toStatisticsBreakdown(
+  rows: GroupedCategoryStatisticsRow[],
+  typeTotal: number,
+): StatisticsBreakdownItem[] {
+  const groupedRows = new Map<string, GroupedCategoryStatisticsRow[]>();
+  const ungroupedRows: CategoryStatisticsRow[] = [];
+
+  for (const row of rows) {
+    if (row.statistics_group_id) {
+      const groupRows = groupedRows.get(row.statistics_group_id) ?? [];
+      groupRows.push(row);
+      groupedRows.set(row.statistics_group_id, groupRows);
+    } else {
+      ungroupedRows.push(toCategoryRow(row));
+    }
+  }
+
+  const groups: StatisticsGroupSummary[] = [...groupedRows.entries()].map(([groupId, groupRows]) => {
+    const firstRow = groupRows[0];
+    const categories = toCategorySummaries(groupRows.map(toCategoryRow), typeTotal);
+    const amountTotal = money(categories.reduce((total, category) => total + category.amountTotal, 0));
+    return {
+      kind: "group",
+      groupId,
+      name: firstRow.statistics_group_name ?? "",
+      color: firstRow.statistics_group_color ?? "",
+      sortOrder: firstRow.statistics_group_sort_order ?? 0,
+      amountTotal,
+      ratio: typeTotal > 0 ? (amountTotal / typeTotal) * 100 : 0,
+      categories,
+    };
+  });
+
+  groups.sort((left, right) => (
+    left.sortOrder - right.sortOrder
+    || right.amountTotal - left.amountTotal
+    || left.groupId.localeCompare(right.groupId)
+  ));
+
+  return [
+    ...groups,
+    ...toCategorySummaries(ungroupedRows, typeTotal).map((category) => ({ kind: "category" as const, category })),
+  ];
 }

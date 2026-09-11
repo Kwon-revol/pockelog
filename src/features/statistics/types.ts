@@ -20,6 +20,33 @@ export type CategorySummary = {
   sortOrder: number;
 };
 
+export type GroupedCategoryStatisticsRow = {
+  category_id: string;
+  category_name: string;
+  category_color: string;
+  category_sort_order: number;
+  amount_total: number | string;
+  statistics_group_id: string | null;
+  statistics_group_name: string | null;
+  statistics_group_color: string | null;
+  statistics_group_sort_order: number | null;
+};
+
+export type StatisticsGroupSummary = {
+  kind: "group";
+  groupId: string;
+  name: string;
+  color: string;
+  sortOrder: number;
+  amountTotal: number;
+  ratio: number;
+  categories: CategorySummary[];
+};
+
+export type StatisticsBreakdownItem =
+  | StatisticsGroupSummary
+  | { kind: "category"; category: CategorySummary };
+
 export type StatisticsOverviewData = {
   ledger: { id: string; name: string; periodStartDay: number | null };
   periods: PeriodSummary[];
@@ -30,6 +57,7 @@ export type StatisticsDetailData = {
   period: PeriodSummary;
   type: TransactionType;
   categories: CategorySummary[];
+  breakdown?: StatisticsBreakdownItem[];
   typeTotal: number;
   filters: TransactionFilters;
   page: TransactionPage;

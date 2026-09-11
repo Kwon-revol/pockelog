@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import {
   formDataToCategoryInput,
   formDataToLedgerSettingsInput,
+  formDataToStatisticsGroupInput,
 } from "@/features/settings/schemas";
 
 describe("settings input schemas", () => {
@@ -59,5 +60,49 @@ describe("settings input schemas", () => {
     invalid.set("name", "부수입");
     invalid.set("color", "green");
     expect(formDataToCategoryInput(invalid).success).toBe(false);
+  });
+
+  it("normalizes a statistics group and keeps unique category ids", () => {
+    const data = new FormData();
+    data.set("type", "expense");
+    data.set("name", "  고정지출  ");
+    data.set("color", "#a1b2c3");
+    data.append("categoryIds", "11111111-1111-4111-8111-111111111111");
+    data.append("categoryIds", "22222222-2222-4222-8222-222222222222");
+
+    const result = formDataToStatisticsGroupInput(data);
+
+    expect(result.success).toBe(true);
+    if (result.success) {
+      expect(result.data).toEqual({
+        type: "expense",
+        name: "고정지출",
+        color: "#A1B2C3",
+        categoryIds: [
+          "11111111-1111-4111-8111-111111111111",
+          "22222222-2222-4222-8222-222222222222",
+        ],
+      });
+    }
+  });
+
+  it.each([
+    { name: "", color: "#10B981", categoryIds: ["11111111-1111-4111-8111-111111111111"] },
+    { name: "x".repeat(31), color: "#10B981", categoryIds: ["11111111-1111-4111-8111-111111111111"] },
+    { name: "고정지출", color: "green", categoryIds: ["11111111-1111-4111-8111-111111111111"] },
+    { name: "고정지출", color: "#10B981", categoryIds: ["not-a-uuid"] },
+    {
+      name: "고정지출",
+      color: "#10B981",
+      categoryIds: ["11111111-1111-4111-8111-111111111111", "11111111-1111-4111-8111-111111111111"],
+    },
+  ])("rejects invalid statistics group input %#", ({ name, color, categoryIds }) => {
+    const data = new FormData();
+    data.set("type", "expense");
+    data.set("name", name);
+    data.set("color", color);
+    for (const categoryId of categoryIds) data.append("categoryIds", categoryId);
+
+    expect(formDataToStatisticsGroupInput(data).success).toBe(false);
   });
 });

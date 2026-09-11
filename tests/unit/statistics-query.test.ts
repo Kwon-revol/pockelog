@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 
 import {
   toCategorySummaries,
+  toStatisticsBreakdown,
   toPeriodSummaries,
 } from "@/features/statistics/query-utils";
 import {
@@ -13,6 +14,7 @@ import {
 } from "@/features/statistics/workflows";
 import { statisticsDetailPath } from "@/features/statistics/routing";
 import type { LedgerPeriod } from "@/features/transactions/period";
+import type { GroupedCategoryStatisticsRow } from "@/features/statistics/types";
 
 const periods: LedgerPeriod[] = [
   { key: "2026-08-10", startOn: "2026-08-10", endOn: "2026-09-09", endExclusive: "2026-09-10" },
@@ -69,6 +71,139 @@ describe("statistics query mapping", () => {
     expect(toCategorySummaries([
       { category_id: "food", category_name: "식비", category_color: "#F97316", sort_order: 1, amount_total: "0" },
     ], 0)[0]?.ratio).toBe(0);
+  });
+
+  it("groups assigned categories before ungrouped categories", () => {
+    const rows: GroupedCategoryStatisticsRow[] = [
+      {
+        category_id: "housing", category_name: "주거비", category_color: "#F97316",
+        category_sort_order: 1, amount_total: "500000",
+        statistics_group_id: "fixed", statistics_group_name: "고정지출",
+        statistics_group_color: "#64748B", statistics_group_sort_order: 0,
+      },
+      {
+        category_id: "phone", category_name: "통신비", category_color: "#3B82F6",
+        category_sort_order: 2, amount_total: "100000",
+        statistics_group_id: "fixed", statistics_group_name: "고정지출",
+        statistics_group_color: "#64748B", statistics_group_sort_order: 0,
+      },
+      {
+        category_id: "food", category_name: "식비", category_color: "#F97316",
+        category_sort_order: 0, amount_total: "200000",
+        statistics_group_id: null, statistics_group_name: null,
+        statistics_group_color: null, statistics_group_sort_order: null,
+      },
+    ];
+
+    expect(toStatisticsBreakdown(rows, 800000)).toEqual([
+      {
+        kind: "group", groupId: "fixed", name: "고정지출", color: "#64748B",
+        sortOrder: 0, amountTotal: 600000, ratio: 75,
+        categories: [
+          { categoryId: "housing", name: "주거비", color: "#F97316", sortOrder: 1, amountTotal: 500000, ratio: 62.5 },
+          { categoryId: "phone", name: "통신비", color: "#3B82F6", sortOrder: 2, amountTotal: 100000, ratio: 12.5 },
+        ],
+      },
+      {
+        kind: "category",
+        category: { categoryId: "food", name: "식비", color: "#F97316", sortOrder: 0, amountTotal: 200000, ratio: 25 },
+      },
+    ]);
+  });
+
+  it("orders groups by configured order, total amount, then group id", () => {
+    const rows: GroupedCategoryStatisticsRow[] = [
+      {
+        category_id: "higher", category_name: "상위", category_color: "#F97316",
+        category_sort_order: 0, amount_total: "200",
+        statistics_group_id: "z-group", statistics_group_name: "Z 그룹",
+        statistics_group_color: "#F97316", statistics_group_sort_order: 1,
+      },
+      {
+        category_id: "lower", category_name: "하위", category_color: "#3B82F6",
+        category_sort_order: 0, amount_total: "100",
+        statistics_group_id: "a-group", statistics_group_name: "A 그룹",
+        statistics_group_color: "#3B82F6", statistics_group_sort_order: 1,
+      },
+      {
+        category_id: "first", category_name: "첫째", category_color: "#10B981",
+        category_sort_order: 0, amount_total: "100",
+        statistics_group_id: "first-group", statistics_group_name: "첫 그룹",
+        statistics_group_color: "#10B981", statistics_group_sort_order: 0,
+      },
+      {
+        category_id: "same", category_name: "동일", category_color: "#8B5CF6",
+        category_sort_order: 0, amount_total: "100",
+        statistics_group_id: "b-group", statistics_group_name: "B 그룹",
+        statistics_group_color: "#8B5CF6", statistics_group_sort_order: 1,
+      },
+    ];
+
+    expect(toStatisticsBreakdown(rows, 500).map((item) => (
+      item.kind === "group" ? item.groupId : item.category.categoryId
+    ))).toEqual(["first-group", "z-group", "a-group", "b-group"]);
+  });
+
+  it("keeps ungrouped categories in the existing category summary order", () => {
+    const rows: GroupedCategoryStatisticsRow[] = [
+      {
+        category_id: "hobby", category_name: "취미", category_color: "#8B5CF6",
+        category_sort_order: 2, amount_total: "10000",
+        statistics_group_id: null, statistics_group_name: null,
+        statistics_group_color: null, statistics_group_sort_order: null,
+      },
+      {
+        category_id: "food", category_name: "식비", category_color: "#F97316",
+        category_sort_order: 1, amount_total: "30000",
+        statistics_group_id: null, statistics_group_name: null,
+        statistics_group_color: null, statistics_group_sort_order: null,
+      },
+    ];
+
+    expect(toStatisticsBreakdown(rows, 40000)).toEqual([
+      {
+        kind: "category",
+        category: { categoryId: "food", name: "식비", color: "#F97316", sortOrder: 1, amountTotal: 30000, ratio: 75 },
+      },
+      {
+        kind: "category",
+        category: { categoryId: "hobby", name: "취미", color: "#8B5CF6", sortOrder: 2, amountTotal: 10000, ratio: 25 },
+      },
+    ]);
+  });
+
+  it("returns zero ratios for groups and categories when the type total is zero", () => {
+    const rows: GroupedCategoryStatisticsRow[] = [
+      {
+        category_id: "food", category_name: "식비", category_color: "#F97316",
+        category_sort_order: 1, amount_total: "10000",
+        statistics_group_id: "variable", statistics_group_name: "변동지출",
+        statistics_group_color: "#F97316", statistics_group_sort_order: 1,
+      },
+    ];
+
+    expect(toStatisticsBreakdown(rows, 0)).toEqual([
+      {
+        kind: "group", groupId: "variable", name: "변동지출", color: "#F97316",
+        sortOrder: 1, amountTotal: 10000, ratio: 0,
+        categories: [
+          { categoryId: "food", name: "식비", color: "#F97316", sortOrder: 1, amountTotal: 10000, ratio: 0 },
+        ],
+      },
+    ]);
+  });
+
+  it("rejects grouped category amounts outside the safe integer range", () => {
+    const rows: GroupedCategoryStatisticsRow[] = [
+      {
+        category_id: "food", category_name: "식비", category_color: "#F97316",
+        category_sort_order: 1, amount_total: "9007199254740992",
+        statistics_group_id: null, statistics_group_name: null,
+        statistics_group_color: null, statistics_group_sort_order: null,
+      },
+    ];
+
+    expect(() => toStatisticsBreakdown(rows, 9007199254740992)).toThrow("statistics amount is not a safe integer");
   });
 });
 

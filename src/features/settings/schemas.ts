@@ -19,6 +19,16 @@ export const categoryFormSchema = z.object({
   color: z.string().trim().regex(/^#[0-9A-Fa-f]{6}$/, "분류 색상을 선택해 주세요.").transform((value) => value.toUpperCase()),
 });
 
+export const statisticsGroupFormSchema = z.object({
+  type: z.enum(["income", "expense"], { message: "수입 또는 지출을 선택해 주세요." }),
+  name: z.string().trim().min(1, "그룹 이름을 입력해 주세요.").max(30, "그룹 이름은 30자 이하로 입력해 주세요."),
+  color: z.string().trim().regex(/^#[0-9A-Fa-f]{6}$/, "그룹 색상을 선택해 주세요.").transform((value) => value.toUpperCase()),
+  categoryIds: z.array(z.string().uuid()).refine(
+    (categoryIds) => new Set(categoryIds).size === categoryIds.length,
+    "분류는 한 번만 선택해 주세요.",
+  ),
+});
+
 function value(formData: FormData, key: string) {
   const entry = formData.get(key);
   return typeof entry === "string" ? entry : "";
@@ -36,5 +46,14 @@ export function formDataToCategoryInput(formData: FormData) {
     type: value(formData, "type"),
     name: value(formData, "name"),
     color: value(formData, "color"),
+  });
+}
+
+export function formDataToStatisticsGroupInput(formData: FormData) {
+  return statisticsGroupFormSchema.safeParse({
+    type: value(formData, "type"),
+    name: value(formData, "name"),
+    color: value(formData, "color"),
+    categoryIds: formData.getAll("categoryIds").filter((entry): entry is string => typeof entry === "string"),
   });
 }
