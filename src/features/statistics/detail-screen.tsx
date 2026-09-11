@@ -1,8 +1,13 @@
 "use client";
 
 import Link from "next/link";
+import { useState } from "react";
 
-import type { StatisticsDetailData } from "@/features/statistics/types";
+import type {
+  CategorySummary,
+  StatisticsDetailData,
+  StatisticsGroupSummary,
+} from "@/features/statistics/types";
 import { TransactionList } from "@/features/transactions/transaction-list";
 import {
   useTransactionPages,
@@ -17,6 +22,59 @@ type StatisticsDetailScreenProps = {
   loadPage?: LoadTransactionPage;
 };
 
+function RatioBar({ color, name, value }: { color: string; name: string; value: number }) {
+  return (
+    <div aria-label={`${name} 비율`} aria-valuemax={100} aria-valuemin={0} aria-valuenow={Math.round(value)} className="h-2.5 overflow-hidden rounded-full bg-slate-100" role="progressbar">
+      <div className="h-full rounded-full" style={{ backgroundColor: color, width: `${Math.min(value, 100)}%` }} />
+    </div>
+  );
+}
+
+function CategoryBreakdownRow({ category }: { category: CategorySummary }) {
+  return (
+    <article>
+      <div className="mb-2 flex items-center gap-2 text-sm">
+        <span className="size-2.5 rounded-full" style={{ backgroundColor: category.color }} />
+        <span className="min-w-0 flex-1 truncate font-black text-slate-900">{category.name}</span>
+        <span className="font-bold text-slate-600">{won.format(category.amountTotal)}원</span>
+        <span className="w-14 text-right text-slate-400">{ratio.format(category.ratio)}%</span>
+      </div>
+      <RatioBar color={category.color} name={category.name} value={category.ratio} />
+    </article>
+  );
+}
+
+function StatisticsGroupRow({
+  expanded,
+  group,
+  onToggle,
+}: {
+  expanded: boolean;
+  group: StatisticsGroupSummary;
+  onToggle: () => void;
+}) {
+  const detailsId = `statistics-group-${group.groupId}`;
+  return (
+    <article>
+      <button aria-controls={detailsId} aria-expanded={expanded} className="mb-2 flex w-full items-center gap-2 text-left text-sm" onClick={onToggle} type="button">
+        <span aria-hidden="true" className="w-3 text-xs font-black text-slate-400">{expanded ? "▾" : "▸"}</span>
+        <span className="size-2.5 rounded-full" style={{ backgroundColor: group.color }} />
+        <span className="min-w-0 flex-1 truncate font-black text-slate-900">{group.name}</span>
+        <span className="font-bold text-slate-600">{won.format(group.amountTotal)}원</span>
+        <span className="w-14 text-right text-slate-400">{ratio.format(group.ratio)}%</span>
+      </button>
+      <RatioBar color={group.color} name={group.name} value={group.ratio} />
+      {expanded ? (
+        <div className="ml-5 mt-4 space-y-4 border-l border-slate-200 pl-4" id={detailsId}>
+          {group.categories.map((category) => (
+            <CategoryBreakdownRow category={category} key={category.categoryId} />
+          ))}
+        </div>
+      ) : null}
+    </article>
+  );
+}
+
 export function StatisticsDetailScreen(props: StatisticsDetailScreenProps) {
   const resetKey = `${props.initialData.period.key}:${props.initialData.type}`;
   return <StatisticsDetailContent {...props} key={resetKey} />;
@@ -27,7 +85,17 @@ function StatisticsDetailContent({
   loadPage,
 }: StatisticsDetailScreenProps) {
   const pages = useTransactionPages(initialData.page, initialData.filters, loadPage);
+  const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(() => new Set());
   const typeLabel = initialData.type === "expense" ? "지출" : "수입";
+
+  function toggleGroup(groupId: string) {
+    setExpandedGroupIds((current) => {
+      const next = new Set(current);
+      if (next.has(groupId)) next.delete(groupId);
+      else next.add(groupId);
+      return next;
+    });
+  }
 
   return (
     <div className="space-y-7">
@@ -47,22 +115,21 @@ function StatisticsDetailContent({
       </nav>
 
       <section aria-label={`분류별 ${typeLabel} 비율`} className="rounded-3xl border border-slate-200 bg-white p-5 shadow-sm sm:p-6">
-        {initialData.categories.length === 0 ? (
+        {initialData.breakdown.length === 0 ? (
           <div className="py-10 text-center"><p className="font-black text-slate-800">표시할 {typeLabel} 내역이 없어요</p><p className="mt-2 text-sm text-slate-500">가계부에서 내역을 추가하면 분류별 비율이 표시됩니다.</p></div>
         ) : (
           <div className="space-y-5">
-            {initialData.categories.map((category) => (
-              <article key={category.categoryId}>
-                <div className="mb-2 flex items-center gap-2 text-sm">
-                  <span className="size-2.5 rounded-full" style={{ backgroundColor: category.color }} />
-                  <span className="min-w-0 flex-1 truncate font-black text-slate-900">{category.name}</span>
-                  <span className="font-bold text-slate-600">{won.format(category.amountTotal)}원</span>
-                  <span className="w-14 text-right text-slate-400">{ratio.format(category.ratio)}%</span>
-                </div>
-                <div aria-label={`${category.name} 비율`} aria-valuemax={100} aria-valuemin={0} aria-valuenow={Math.round(category.ratio)} className="h-2.5 overflow-hidden rounded-full bg-slate-100" role="progressbar">
-                  <div className="h-full rounded-full" style={{ backgroundColor: category.color, width: `${Math.min(category.ratio, 100)}%` }} />
-                </div>
-              </article>
+            {initialData.breakdown.map((item) => (
+              item.kind === "group" ? (
+                <StatisticsGroupRow
+                  expanded={expandedGroupIds.has(item.groupId)}
+                  group={item}
+                  key={item.groupId}
+                  onToggle={() => toggleGroup(item.groupId)}
+                />
+              ) : (
+                <CategoryBreakdownRow category={item.category} key={item.category.categoryId} />
+              )
             ))}
           </div>
         )}

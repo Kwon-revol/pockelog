@@ -1,4 +1,5 @@
 import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { StatisticsDetailScreen } from "@/features/statistics/detail-screen";
@@ -47,11 +48,26 @@ const detailFixture: StatisticsDetailData = {
   ledger: overviewFixture.ledger,
   period: overviewFixture.periods[0],
   type: "expense",
-  categories: [
-    { categoryId: "food", name: "식비", color: "#F97316", amountTotal: 30000, ratio: 75, sortOrder: 1 },
-    { categoryId: "hobby", name: "취미", color: "#8B5CF6", amountTotal: 10000, ratio: 25, sortOrder: 2 },
+  breakdown: [
+    {
+      kind: "group",
+      groupId: "fixed",
+      name: "고정지출",
+      color: "#64748B",
+      sortOrder: 0,
+      amountTotal: 600000,
+      ratio: 75,
+      categories: [
+        { categoryId: "housing", name: "주거비", color: "#F97316", amountTotal: 500000, ratio: 62.5, sortOrder: 1 },
+        { categoryId: "phone", name: "통신비", color: "#3B82F6", amountTotal: 100000, ratio: 12.5, sortOrder: 2 },
+      ],
+    },
+    {
+      kind: "category",
+      category: { categoryId: "food", name: "식비", color: "#F97316", amountTotal: 200000, ratio: 25, sortOrder: 0 },
+    },
   ],
-  typeTotal: 40000,
+  typeTotal: 800000,
   filters: {
     startOn: "2026-08-10",
     endOn: "2026-09-09",
@@ -128,12 +144,63 @@ describe("StatisticsDetailScreen", () => {
     vi.unstubAllGlobals();
   });
 
-  it("shows category ratios, a type switch, and read-only source transactions", () => {
+  it("shows grouped totals collapsed and expands their category details", async () => {
+    const user = userEvent.setup();
     render(<StatisticsDetailScreen initialData={detailFixture} />);
     expect(screen.getByRole("heading", { name: "분류별 지출" })).toBeVisible();
     const categories = screen.getByRole("region", { name: "분류별 지출 비율" });
+    const groupButton = within(categories).getByRole("button", { name: /고정지출.*600,000원.*75%/ });
+    expect(groupButton).toHaveAttribute("aria-expanded", "false");
+    expect(within(categories).queryByText("주거비")).not.toBeInTheDocument();
+    expect(within(categories).queryByText("통신비")).not.toBeInTheDocument();
     expect(within(categories).getByText("식비")).toBeVisible();
-    expect(within(categories).getByText("75%")).toBeVisible();
+
+    await user.click(groupButton);
+
+    expect(groupButton).toHaveAttribute("aria-expanded", "true");
+    expect(within(categories).getByText("주거비")).toBeVisible();
+    expect(within(categories).getByText("통신비")).toBeVisible();
+    expect(within(categories).getByRole("progressbar", { name: "고정지출 비율" })).toBeVisible();
+    expect(within(categories).getByRole("progressbar", { name: "주거비 비율" })).toBeVisible();
+
+    await user.keyboard(" ");
+    expect(groupButton).toHaveAttribute("aria-expanded", "false");
+    await user.keyboard("{Enter}");
+    expect(groupButton).toHaveAttribute("aria-expanded", "true");
+  });
+
+  it("preserves the legacy flat category presentation and ordering without groups", () => {
+    const flatData: StatisticsDetailData = {
+      ...detailFixture,
+      typeTotal: 40000,
+      breakdown: [
+        {
+          kind: "category",
+          category: { categoryId: "food", name: "식비", color: "#F97316", amountTotal: 30000, ratio: 75, sortOrder: 1 },
+        },
+        {
+          kind: "category",
+          category: { categoryId: "hobby", name: "취미", color: "#8B5CF6", amountTotal: 10000, ratio: 25, sortOrder: 2 },
+        },
+      ],
+    };
+    render(<StatisticsDetailScreen initialData={flatData} />);
+    const categories = screen.getByRole("region", { name: "분류별 지출 비율" });
+    const articles = within(categories).getAllByRole("article");
+
+    expect(within(articles[0]).getByText("식비")).toBeVisible();
+    expect(within(articles[0]).getByText("30,000원")).toBeVisible();
+    expect(within(articles[0]).getByText("75%")).toBeVisible();
+    expect(within(articles[0]).getByRole("progressbar", { name: "식비 비율" }))
+      .toHaveAttribute("aria-valuenow", "75");
+    expect(within(articles[1]).getByText("취미")).toBeVisible();
+    expect(within(articles[1]).getByText("10,000원")).toBeVisible();
+    expect(within(articles[1]).getByText("25%")).toBeVisible();
+    expect(within(categories).queryByRole("button")).not.toBeInTheDocument();
+  });
+
+  it("preserves the type switch and read-only source transactions", () => {
+    render(<StatisticsDetailScreen initialData={detailFixture} />);
     expect(screen.getByRole("link", { name: "수입" })).toHaveAttribute("href", "?type=income");
     expect(screen.getByRole("region", { name: "거래 내역" })).toBeVisible();
     expect(screen.queryByRole("button", { name: /점심/ })).not.toBeInTheDocument();
@@ -166,7 +233,10 @@ describe("StatisticsDetailScreen", () => {
       type: "income",
       typeTotal: 100000,
       filters: { ...detailFixture.filters, type: "income" },
-      categories: [{ categoryId: "side", name: "부수입", color: "#10B981", amountTotal: 100000, ratio: 100, sortOrder: 2 }],
+      breakdown: [{
+        kind: "category",
+        category: { categoryId: "side", name: "부수입", color: "#10B981", amountTotal: 100000, ratio: 100, sortOrder: 2 },
+      }],
       page: {
         items: [{
           ...detailFixture.page.items[0],

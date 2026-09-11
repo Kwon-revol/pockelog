@@ -56,8 +56,7 @@ export type StatisticsDetailData = {
   ledger: { id: string; name: string; periodStartDay: number | null };
   period: PeriodSummary;
   type: TransactionType;
-  categories: CategorySummary[];
-  breakdown?: StatisticsBreakdownItem[];
+  breakdown: StatisticsBreakdownItem[];
   typeTotal: number;
   filters: TransactionFilters;
   page: TransactionPage;

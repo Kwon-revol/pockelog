@@ -1,4 +1,13 @@
-import { describe, expect, it } from "vitest";
+import { beforeEach, describe, expect, it, vi } from "vitest";
+
+const mocks = vi.hoisted(() => ({
+  createServerClient: vi.fn(),
+}));
+
+vi.mock("server-only", () => ({}));
+vi.mock("@/shared/supabase/server", () => ({
+  createServerClient: mocks.createServerClient,
+}));
 
 import {
   toCategorySummaries,
@@ -12,6 +21,7 @@ import {
   StatisticsQueryError,
   type StatisticsGateway,
 } from "@/features/statistics/workflows";
+import { createSupabaseStatisticsGateway } from "@/features/statistics/supabase-gateway";
 import { statisticsDetailPath } from "@/features/statistics/routing";
 import type { LedgerPeriod } from "@/features/transactions/period";
 import type { GroupedCategoryStatisticsRow } from "@/features/statistics/types";
@@ -34,8 +44,18 @@ function gateway(overrides: Partial<StatisticsGateway> = {}): StatisticsGateway 
       { period_ordinal: 2, start_on: "2026-07-10", end_exclusive: "2026-08-10", income_total: "0", expense_total: "0", balance: "0" },
     ],
     getCategoryRows: async () => [
-      { category_id: "food", category_name: "식비", category_color: "#F97316", sort_order: 1, amount_total: "30000" },
-      { category_id: "hobby", category_name: "취미", category_color: "#8B5CF6", sort_order: 2, amount_total: "10000" },
+      {
+        category_id: "food", category_name: "식비", category_color: "#F97316",
+        category_sort_order: 1, amount_total: "30000",
+        statistics_group_id: null, statistics_group_name: null,
+        statistics_group_color: null, statistics_group_sort_order: null,
+      },
+      {
+        category_id: "hobby", category_name: "취미", category_color: "#8B5CF6",
+        category_sort_order: 2, amount_total: "10000",
+        statistics_group_id: null, statistics_group_name: null,
+        statistics_group_color: null, statistics_group_sort_order: null,
+      },
     ],
     getTransactionPage: async () => emptyPage,
     ...overrides,
@@ -207,6 +227,92 @@ describe("statistics query mapping", () => {
   });
 });
 
+describe("Supabase statistics category query", () => {
+  const expectedArgs = {
+    target_ledger_id: "ledger-1",
+    start_on: "2026-08-10",
+    end_exclusive: "2026-09-10",
+    target_type: "expense",
+  };
+
+  beforeEach(() => {
+    mocks.createServerClient.mockReset();
+  });
+
+  it("queries grouped category statistics first", async () => {
+    const groupedRows: GroupedCategoryStatisticsRow[] = [{
+      category_id: "housing", category_name: "주거비", category_color: "#F97316",
+      category_sort_order: 1, amount_total: "500000",
+      statistics_group_id: "fixed", statistics_group_name: "고정지출",
+      statistics_group_color: "#64748B", statistics_group_sort_order: 0,
+    }];
+    const rpc = vi.fn().mockResolvedValue({ data: groupedRows, error: null });
+    mocks.createServerClient.mockResolvedValue({ rpc });
+    const supabaseGateway = await createSupabaseStatisticsGateway();
+
+    await expect(supabaseGateway.getCategoryRows("ledger-1", periods[0], "expense"))
+      .resolves.toEqual(groupedRows);
+    expect(rpc).toHaveBeenCalledOnce();
+    expect(rpc).toHaveBeenCalledWith("get_grouped_category_statistics", expectedArgs);
+  });
+
+  it.each(["PGRST202", "42883"])(
+    "falls back to legacy category statistics only when the grouped RPC is missing (%s)",
+    async (code) => {
+      const legacyRows = [{
+        category_id: "food",
+        category_name: "식비",
+        category_color: "#F97316",
+        sort_order: 1,
+        amount_total: "30000",
+      }];
+      const rpc = vi.fn()
+        .mockResolvedValueOnce({ data: null, error: { code, message: "missing function" } })
+        .mockResolvedValueOnce({ data: legacyRows, error: null });
+      mocks.createServerClient.mockResolvedValue({ rpc });
+      const supabaseGateway = await createSupabaseStatisticsGateway();
+
+      await expect(supabaseGateway.getCategoryRows("ledger-1", periods[0], "expense"))
+        .resolves.toEqual([{
+          category_id: "food",
+          category_name: "식비",
+          category_color: "#F97316",
+          category_sort_order: 1,
+          amount_total: "30000",
+          statistics_group_id: null,
+          statistics_group_name: null,
+          statistics_group_color: null,
+          statistics_group_sort_order: null,
+        }]);
+      expect(rpc).toHaveBeenNthCalledWith(1, "get_grouped_category_statistics", expectedArgs);
+      expect(rpc).toHaveBeenNthCalledWith(2, "get_category_statistics", expectedArgs);
+    },
+  );
+
+  it.each([
+    ["permission", { code: "42501", message: "permission denied" }],
+    ["other schema", { code: "PGRST205", message: "schema cache miss" }],
+  ])("does not fall back after a %s error", async (_label, queryError) => {
+    const rpc = vi.fn().mockResolvedValue({ data: null, error: queryError });
+    mocks.createServerClient.mockResolvedValue({ rpc });
+    const supabaseGateway = await createSupabaseStatisticsGateway();
+
+    await expect(supabaseGateway.getCategoryRows("ledger-1", periods[0], "expense"))
+      .rejects.toBeInstanceOf(StatisticsQueryError);
+    expect(rpc).toHaveBeenCalledOnce();
+  });
+
+  it("wraps a network rejection without falling back", async () => {
+    const rpc = vi.fn().mockRejectedValue(new Error("network request failed"));
+    mocks.createServerClient.mockResolvedValue({ rpc });
+    const supabaseGateway = await createSupabaseStatisticsGateway();
+
+    await expect(supabaseGateway.getCategoryRows("ledger-1", periods[0], "expense"))
+      .rejects.toBeInstanceOf(StatisticsQueryError);
+    expect(rpc).toHaveBeenCalledOnce();
+  });
+});
+
 describe("statistics loading workflows", () => {
   it("loads the latest twelve periods", async () => {
     const result = await loadStatisticsOverview(
@@ -221,7 +327,11 @@ describe("statistics loading workflows", () => {
     const result = await loadStatisticsDetail("2026-08-10", "invalid", gateway());
     expect(result.type).toBe("expense");
     expect(result.typeTotal).toBe(800000);
-    expect(result.categories[0]).toMatchObject({ name: "식비", ratio: 3.75 });
+    expect(result.breakdown[0]).toMatchObject({
+      kind: "category",
+      category: { name: "식비", ratio: 3.75 },
+    });
+    expect(result).not.toHaveProperty("categories");
     expect(result.filters).toMatchObject({ startOn: "2026-08-10", endExclusive: "2026-09-10", type: "expense" });
   });
 

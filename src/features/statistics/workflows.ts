@@ -1,10 +1,10 @@
 import {
-  toCategorySummaries,
   toPeriodSummaries,
-  type CategoryStatisticsRow,
+  toStatisticsBreakdown,
   type PeriodStatisticsRow,
 } from "@/features/statistics/query-utils";
 import type {
+  GroupedCategoryStatisticsRow,
   StatisticsDetailData,
   StatisticsOverviewData,
 } from "@/features/statistics/types";
@@ -31,7 +31,7 @@ export interface StatisticsGateway {
     ledgerId: string,
     period: LedgerPeriod,
     type: TransactionType,
-  ): Promise<CategoryStatisticsRow[]>;
+  ): Promise<GroupedCategoryStatisticsRow[]>;
   getTransactionPage(filters: TransactionFilters): Promise<TransactionPage>;
 }
 
@@ -95,7 +95,7 @@ export async function loadStatisticsDetail(
       ledger: context.ledger,
       period: summary,
       type,
-      categories: toCategorySummaries(categoryRows, typeTotal),
+      breakdown: toStatisticsBreakdown(categoryRows, typeTotal),
       typeTotal,
       filters,
       page,
