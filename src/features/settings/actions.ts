@@ -5,12 +5,16 @@ import { revalidatePath } from "next/cache";
 import {
   formDataToCategoryInput,
   formDataToLedgerSettingsInput,
+  formDataToStatisticsGroupInput,
 } from "@/features/settings/schemas";
 import { createSupabaseSettingsGateway } from "@/features/settings/supabase-gateway";
 import type { SettingsActionState } from "@/features/settings/types";
 import {
   createCategory,
+  deleteStatisticsGroup,
   moveCategory,
+  moveStatisticsGroup,
+  saveStatisticsGroup,
   setCategoryActive,
   updateCategory,
   updateLedgerSettings,
@@ -30,6 +34,11 @@ function invalidState(
 function revalidateSettingsConsumers() {
   revalidatePath("/settings");
   revalidatePath("/ledger");
+  revalidatePath("/statistics");
+}
+
+function revalidateStatisticsGroupConsumers() {
+  revalidatePath("/settings");
   revalidatePath("/statistics");
 }
 
@@ -87,5 +96,59 @@ export async function moveCategoryAction(
     await createSupabaseSettingsGateway(),
   );
   if (result.status === "success") revalidateSettingsConsumers();
+  return result;
+}
+
+export async function createStatisticsGroupAction(
+  _previousState: SettingsActionState,
+  formData: FormData,
+): Promise<SettingsActionState> {
+  const parsed = formDataToStatisticsGroupInput(formData);
+  if (!parsed.success) return invalidState(parsed);
+  const result = await saveStatisticsGroup(
+    null,
+    parsed.data,
+    await createSupabaseSettingsGateway(),
+  );
+  if (result.status === "success") revalidateStatisticsGroupConsumers();
+  return result;
+}
+
+export async function updateStatisticsGroupAction(
+  groupId: string,
+  _previousState: SettingsActionState,
+  formData: FormData,
+): Promise<SettingsActionState> {
+  const parsed = formDataToStatisticsGroupInput(formData);
+  if (!parsed.success) return invalidState(parsed);
+  const result = await saveStatisticsGroup(
+    groupId,
+    parsed.data,
+    await createSupabaseSettingsGateway(),
+  );
+  if (result.status === "success") revalidateStatisticsGroupConsumers();
+  return result;
+}
+
+export async function deleteStatisticsGroupAction(groupId: string): Promise<SettingsActionState> {
+  const result = await deleteStatisticsGroup(groupId, await createSupabaseSettingsGateway());
+  if (result.status === "success") revalidateStatisticsGroupConsumers();
+  return result;
+}
+
+export async function moveStatisticsGroupAction(
+  groupId: string,
+  direction: "up" | "down",
+  type: TransactionType,
+  orderedIds: string[],
+): Promise<SettingsActionState> {
+  const result = await moveStatisticsGroup(
+    groupId,
+    direction,
+    type,
+    orderedIds,
+    await createSupabaseSettingsGateway(),
+  );
+  if (result.status === "success") revalidateStatisticsGroupConsumers();
   return result;
 }

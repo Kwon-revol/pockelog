@@ -1,5 +1,6 @@
 import "server-only";
 
+import { isStatisticsGroupsSchemaMissing } from "@/features/settings/gateway-utils";
 import { mapSettingsPageData } from "@/features/settings/query-utils";
 import type { SettingsPageData } from "@/features/settings/types";
 import { createServerClient } from "@/shared/supabase/server";
@@ -21,19 +22,65 @@ export async function getSettingsPageData(): Promise<SettingsPageData | null> {
   }
 
   const ledgerId = privateProfile.default_ledger_id;
-  const [ledgerResult, memberResult, categoryResult] = await Promise.all([
+  const [ledgerResult, memberResult] = await Promise.all([
     supabase.from("ledgers").select("id,name,period_start_day").eq("id", ledgerId).maybeSingle(),
     supabase.from("ledger_members").select("role").eq("ledger_id", ledgerId).eq("user_id", user.id).maybeSingle(),
-    supabase.from("categories").select("id,type,name,color,sort_order,is_active").eq("ledger_id", ledgerId),
   ]);
 
   if (
     ledgerResult.error || !ledgerResult.data
     || memberResult.error || !memberResult.data
-    || categoryResult.error
   ) {
     throw new SettingsQueryError("설정 정보를 불러오지 못했습니다.");
   }
 
-  return mapSettingsPageData(ledgerResult.data, memberResult.data, categoryResult.data ?? []);
+  const [statisticsGroupResult, categoryResult] = await Promise.all([
+    supabase
+      .from("statistics_groups")
+      .select("id,type,name,color,sort_order")
+      .eq("ledger_id", ledgerId),
+    supabase
+      .from("categories")
+      .select("id,type,name,color,sort_order,is_active,statistics_group_id")
+      .eq("ledger_id", ledgerId),
+  ]);
+
+  if (!statisticsGroupResult.error && !categoryResult.error) {
+    return mapSettingsPageData(
+      ledgerResult.data,
+      memberResult.data,
+      categoryResult.data ?? [],
+      statisticsGroupResult.data ?? [],
+      true,
+    );
+  }
+
+  const queryErrors = [statisticsGroupResult.error, categoryResult.error].filter(
+    (error): error is NonNullable<typeof error> => Boolean(error),
+  );
+  if (
+    queryErrors.length === 0
+    || queryErrors.some((error) => !isStatisticsGroupsSchemaMissing(error))
+  ) {
+    throw new SettingsQueryError("설정 정보를 불러오지 못했습니다.");
+  }
+
+  const { data: legacyCategories, error: legacyCategoryError } = await supabase
+    .from("categories")
+    .select("id,type,name,color,sort_order,is_active")
+    .eq("ledger_id", ledgerId);
+  if (legacyCategoryError) {
+    throw new SettingsQueryError("설정 정보를 불러오지 못했습니다.");
+  }
+
+  return mapSettingsPageData(
+    ledgerResult.data,
+    memberResult.data,
+    (legacyCategories ?? []).map((category) => ({
+      ...category,
+      statistics_group_id: null,
+    })),
+    [],
+    false,
+  );
 }

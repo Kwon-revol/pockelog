@@ -2,6 +2,8 @@ import "server-only";
 
 import {
   mapCategoryUpdateResult,
+  mapStatisticsGroupChangeResult,
+  mapStatisticsGroupSaveResult,
   resolveNextCategorySortOrder,
 } from "@/features/settings/gateway-utils";
 import type { SettingsGateway } from "@/features/settings/workflows";
@@ -89,6 +91,34 @@ export async function createSupabaseSettingsGateway(): Promise<SettingsGateway> 
         ordered_ids: orderedIds,
       });
       return !error ? "updated" : error.code === "42501" || error.code === "P0001" ? "forbidden" : "error";
+    },
+
+    async saveStatisticsGroup(context, groupId, input) {
+      const { error } = await supabase.rpc("save_statistics_group", {
+        target_group_id: groupId,
+        target_ledger_id: context.ledgerId,
+        target_type: input.type,
+        target_name: input.name,
+        target_color: input.color,
+        target_category_ids: input.categoryIds,
+      });
+      return mapStatisticsGroupSaveResult(error);
+    },
+
+    async deleteStatisticsGroup(_context, groupId) {
+      const { error } = await supabase.rpc("delete_statistics_group", {
+        target_group_id: groupId,
+      });
+      return mapStatisticsGroupChangeResult(error);
+    },
+
+    async setStatisticsGroupOrder(context, type, orderedIds) {
+      const { error } = await supabase.rpc("set_statistics_group_order", {
+        target_ledger_id: context.ledgerId,
+        target_type: type,
+        ordered_ids: orderedIds,
+      });
+      return mapStatisticsGroupChangeResult(error);
     },
   };
 }

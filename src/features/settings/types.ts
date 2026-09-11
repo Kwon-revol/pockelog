@@ -27,7 +27,7 @@ export type SettingsCategory = CategoryInput & {
   id: string;
   sortOrder: number;
   isActive: boolean;
-  statisticsGroupId?: string | null;
+  statisticsGroupId: string | null;
 };
 
 export type SettingsPageData = {
@@ -38,8 +38,8 @@ export type SettingsPageData = {
   };
   isOwner: boolean;
   categories: SettingsCategory[];
-  statisticsGroups?: SettingsStatisticsGroup[];
-  statisticsGroupsAvailable?: boolean;
+  statisticsGroups: SettingsStatisticsGroup[];
+  statisticsGroupsAvailable: boolean;
 };
 
 export type SettingsActionState = {
