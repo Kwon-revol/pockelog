@@ -251,6 +251,72 @@ select
 npm run test:e2e -- --project=desktop-chromium --project=mobile-chromium tests/e2e/settings.spec.ts
 ```
 
+## 통계 그룹 마이그레이션 적용
+
+통계 그룹 앱 코드 배포 전에 `supabase/migrations/202609110009_statistics_groups.sql`을
+SQL Editor에서 한 번 실행한다. 기존 `202609030009_trash_active_transaction.sql`과
+파일명 끝의 `009`가 같지만 전체 타임스탬프가 다른 별도 마이그레이션이다. 기존 마이그레이션을
+대체하거나 건너뛰지 않고 `202609030009_trash_active_transaction.sql` 다음에 적용한다.
+
+1. 001~008 및 `202609030009_trash_active_transaction.sql`이 적용된 전용 개발 프로젝트에서
+   통계 그룹 마이그레이션을 한 번 실행한다.
+2. 아래 스키마 확인 쿼리와 권한 확인 쿼리의 모든 결과가 `true`인지 확인한다.
+3. 소유자 계정의 그룹 저장·정렬·삭제와 일반 구성원의 조회·변경 거부를 확인한다.
+   그룹 삭제 전후 상세 분류와 거래가 유지되고 연결만 해제되는지도 확인한다.
+4. 운영 프로젝트를 확인한 뒤 같은 마이그레이션을 한 번 적용하고 동일한 확인 쿼리를 실행한다.
+5. 검증이 끝난 다음 통계 그룹 앱 코드를 배포하고 소유자·일반 구성원의 설정과 통계 화면을 확인한다.
+
+```sql
+select
+  to_regclass('public.statistics_groups') is not null as statistics_groups_exists,
+  exists (
+    select 1 from information_schema.columns
+    where table_schema = 'public' and table_name = 'categories'
+      and column_name = 'statistics_group_id'
+  ) as category_group_column_exists,
+  to_regprocedure('public.save_statistics_group(uuid,uuid,transaction_type,text,text,uuid[])') is not null as save_group_exists,
+  to_regprocedure('public.delete_statistics_group(uuid)') is not null as delete_group_exists,
+  to_regprocedure('public.set_statistics_group_order(uuid,transaction_type,uuid[])') is not null as order_group_exists,
+  to_regprocedure('public.get_grouped_category_statistics(uuid,date,date,transaction_type)') is not null as grouped_statistics_exists,
+  (select relrowsecurity from pg_class where oid = to_regclass('public.statistics_groups')) as all_rls_enabled;
+```
+
+```sql
+select signature,
+  has_function_privilege('authenticated', signature, 'execute') as authenticated_can_execute,
+  not has_function_privilege('anon', signature, 'execute') as anon_cannot_execute,
+  not exists (
+    select 1
+    from pg_proc as routine,
+      lateral aclexplode(coalesce(routine.proacl, acldefault('f', routine.proowner))) as privilege
+    where routine.oid = to_regprocedure(signature)
+      and privilege.grantee = 0 and privilege.privilege_type = 'EXECUTE'
+  ) as public_cannot_execute,
+  (select proconfig @> array['search_path=""'] from pg_proc
+    where oid = to_regprocedure(signature)) as empty_search_path
+from (values
+  ('public.save_statistics_group(uuid,uuid,transaction_type,text,text,uuid[])'),
+  ('public.delete_statistics_group(uuid)'),
+  ('public.set_statistics_group_order(uuid,transaction_type,uuid[])'),
+  ('public.get_grouped_category_statistics(uuid,date,date,transaction_type)')
+) as functions(signature);
+```
+
+그룹 저장 RPC의 이름 있는 인자는 `target_group_id`, `target_ledger_id`, `target_type`,
+`target_name`, `target_color`, `target_category_ids`이다. 새 그룹은 `target_group_id = null`로
+저장한다. 이름 앞뒤 공백과 색상 대소문자를 정규화한다. 빈 분류 배열은 기존 연결을 모두 해제하고,
+null 배열·중복·없는 분류·다른 장부·다른 유형 분류는 `P0001`로 전체 저장을 취소한다.
+정렬 RPC의 `ordered_ids`는 대상 장부·유형의 전체 그룹 ID를 정확히 한 번씩 포함해야 한다.
+세 변경 RPC는 소유자만 호출하며 같은 장부의 RPC 변경을 잠금으로 직렬화한다.
+
+기존 `get_category_statistics`는 변경하지 않는다. 따라서 마이그레이션 선적용 중에도 기존 앱이
+동작하며 앱 롤백 시 새 테이블과 nullable 연결 열은 유지한다. 운영 데이터가 생긴 스키마를
+삭제하는 방식으로 롤백하지 않는다.
+
+로컬 Supabase 테스트 DB를 사용할 수 있을 때 `supabase test db --file tests/db/010_statistics_groups.test.sql`로
+pgTAP 계약을 실행한다. CLI나 테스트 DB가 없는 환경에서는 실행하지 못한 사실을 기록하고,
+정적 SQL 검토와 위 확인 쿼리를 구분해서 기록한다. 정적 검토는 pgTAP 통과를 대신하지 않는다.
+
 ### 계산 범위와 공식 근거
 
 현재 앱은 **2026년 근로소득자 연금계좌 세액공제만** 계산한다. 다른 과세연도,
