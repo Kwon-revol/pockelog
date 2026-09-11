@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFile } from "node:fs/promises";
 
 import { metadata, viewport } from "@/app/layout";
 import manifest from "@/app/manifest";
@@ -63,5 +64,12 @@ describe("PWA metadata", () => {
     });
     expect(viewport).not.toHaveProperty("maximumScale");
     expect(viewport).not.toHaveProperty("userScalable");
+  });
+
+  it("keeps form controls at 16px to prevent focus zoom on mobile Safari", async () => {
+    const css = await readFile("src/app/globals.css", "utf8");
+
+    expect(css).toContain("@media (max-width: 767px)");
+    expect(css).toMatch(/input,\s*select,\s*textarea\s*{[\s\S]*?font-size:\s*16px\s*!important;/);
   });
 });
