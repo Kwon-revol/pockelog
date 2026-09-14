@@ -225,6 +225,26 @@ describe("statistics query mapping", () => {
 
     expect(() => toStatisticsBreakdown(rows, 9007199254740992)).toThrow("statistics amount is not a safe integer");
   });
+
+  it("rejects a group total outside the safe integer range", () => {
+    const rows: GroupedCategoryStatisticsRow[] = [
+      {
+        category_id: "housing", category_name: "주거비", category_color: "#F97316",
+        category_sort_order: 1, amount_total: "4503599627370496",
+        statistics_group_id: "fixed", statistics_group_name: "고정지출",
+        statistics_group_color: "#64748B", statistics_group_sort_order: 0,
+      },
+      {
+        category_id: "phone", category_name: "통신비", category_color: "#3B82F6",
+        category_sort_order: 2, amount_total: "4503599627370496",
+        statistics_group_id: "fixed", statistics_group_name: "고정지출",
+        statistics_group_color: "#64748B", statistics_group_sort_order: 0,
+      },
+    ];
+
+    expect(() => toStatisticsBreakdown(rows, Number.MAX_SAFE_INTEGER))
+      .toThrow("statistics amount is not a safe integer");
+  });
 });
 
 describe("Supabase statistics category query", () => {
