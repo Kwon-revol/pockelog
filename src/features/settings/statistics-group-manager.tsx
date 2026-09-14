@@ -41,18 +41,22 @@ function StatisticsGroupForm({
   group,
   categories,
   action,
+  disabled,
   onClose,
+  onPendingChange,
 }: {
   type: TransactionType;
   group: SettingsStatisticsGroup | null;
   categories: SettingsCategory[];
   action: SettingsFormAction;
+  disabled: boolean;
   onClose(): void;
+  onPendingChange(pending: boolean): void;
 }) {
   const [name, setName] = useState(group?.name ?? "");
   const [selectedIds, setSelectedIds] = useState(() => new Set(group?.categoryIds ?? []));
   const [color, setColor] = useState(group?.color ?? colorPresets[0]);
-  const [state, formAction] = useActionState(
+  const [state, formAction, pending] = useActionState(
     async (previousState: SettingsActionState, formData: FormData) => {
       try {
         return await action(previousState, formData);
@@ -69,6 +73,14 @@ function StatisticsGroupForm({
   useEffect(() => {
     if (state.status === "success") onClose();
   }, [onClose, state.status]);
+
+  useEffect(() => {
+    onPendingChange(pending);
+  }, [onPendingChange, pending]);
+
+  useEffect(() => () => onPendingChange(false), [onPendingChange]);
+
+  const formDisabled = disabled || pending;
 
   const movesExistingCategory = categories.some((category) => (
     selectedIds.has(category.id)
@@ -93,10 +105,11 @@ function StatisticsGroupForm({
           <p className="text-xs font-bold text-emerald-700">{typeLabel} 그룹</p>
           <h3 className="mt-1 text-lg font-black text-slate-950">{group ? `${group.name} 수정` : "새 통계 그룹"}</h3>
         </div>
-        <button className="rounded-xl px-3 py-2 text-sm font-bold text-slate-600 hover:bg-white" onClick={onClose} type="button">편집 취소</button>
+        <button className="rounded-xl px-3 py-2 text-sm font-bold text-slate-600 hover:bg-white disabled:opacity-50" disabled={formDisabled} onClick={onClose} type="button">편집 취소</button>
       </div>
-      <form action={formAction} className="mt-5 space-y-5" noValidate>
-        <input name="type" type="hidden" value={type} />
+      <form action={formAction} className="mt-5" noValidate>
+        <fieldset className="space-y-5 disabled:opacity-60" disabled={formDisabled}>
+          <input name="type" type="hidden" value={type} />
         <label className="block text-sm font-bold text-slate-700">
           그룹 이름
           <input className="mt-2 w-full rounded-2xl border border-slate-200 bg-white px-4 py-3 outline-none focus:border-emerald-500" maxLength={30} name="name" onChange={(event) => setName(event.target.value)} required value={name} />
@@ -145,7 +158,8 @@ function StatisticsGroupForm({
         </fieldset>
         {movesExistingCategory ? <p className="rounded-2xl bg-amber-50 px-4 py-3 text-sm font-semibold text-amber-800">저장하면 기존 그룹에서 이 그룹으로 이동해요.</p> : null}
         {state.message && state.status === "error" ? <p className="rounded-2xl bg-rose-50 px-4 py-3 text-sm font-semibold text-rose-700" role="alert">{state.message}</p> : null}
-        <SubmitButton>그룹 저장</SubmitButton>
+          <SubmitButton>그룹 저장</SubmitButton>
+        </fieldset>
       </form>
     </div>
   );
@@ -167,7 +181,9 @@ export function StatisticsGroupManager({
   const [type, setType] = useState<TransactionType>("expense");
   const [editor, setEditor] = useState<SettingsStatisticsGroup | "new" | null>(null);
   const [result, setResult] = useState<SettingsActionState>(initialSettingsActionState);
-  const [pending, startTransition] = useTransition();
+  const [formPending, setFormPending] = useState(false);
+  const [mutationPending, startTransition] = useTransition();
+  const busy = formPending || mutationPending;
   const typedGroups = useMemo(
     () => groups
       .filter((group) => group.type === type)
@@ -212,13 +228,14 @@ export function StatisticsGroupManager({
           <h2 className="mt-1 text-xl font-black text-slate-950" id="statistics-group-settings-title">통계 그룹 관리</h2>
           <p className="mt-2 text-sm leading-6 text-slate-500">상세 분류를 묶어 통계에서 함께 보고, 거래 입력에서는 기존 상세 분류를 그대로 사용합니다.</p>
         </div>
-        {isOwner ? <button className="rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white hover:bg-emerald-700" disabled={pending} onClick={() => setEditor("new")} type="button">통계 그룹 추가</button> : null}
+        {isOwner ? <button className="rounded-2xl bg-emerald-600 px-4 py-2.5 text-sm font-black text-white hover:bg-emerald-700" disabled={busy} onClick={() => setEditor("new")} type="button">통계 그룹 추가</button> : null}
       </div>
       <div aria-label="통계 그룹 유형" className="mt-5 grid grid-cols-2 rounded-2xl bg-slate-100 p-1 sm:max-w-sm" role="group">
         {(["expense", "income"] as const).map((value) => (
           <button
             aria-pressed={type === value}
             className={`rounded-xl px-4 py-2.5 text-sm font-bold ${type === value ? "bg-white text-slate-950 shadow-sm" : "text-slate-500"}`}
+            disabled={busy}
             key={value}
             onClick={() => {
               setType(value);
@@ -235,9 +252,11 @@ export function StatisticsGroupManager({
         <StatisticsGroupForm
           action={editor === "new" ? actions.createAction : actions.updateAction.bind(null, editor.id)}
           categories={typedCategories}
+          disabled={mutationPending}
           group={editor === "new" ? null : editor}
           key={editor === "new" ? `new-${type}` : editor.id}
           onClose={() => setEditor(null)}
+          onPendingChange={setFormPending}
           type={type}
         />
       ) : null}
@@ -252,13 +271,13 @@ export function StatisticsGroupManager({
                 <span className="text-xs font-semibold text-slate-400">{index + 1}번째</span>
                 {isOwner ? (
                   <div className="flex items-center gap-1">
-                    <button aria-label={`${group.name} 위로 이동`} className="rounded-lg px-2 py-1 text-slate-500 disabled:opacity-30" disabled={pending || index === 0} onClick={() => run(() => actions.moveAction(group.id, "up", type, orderedIds))} type="button">↑</button>
-                    <button aria-label={`${group.name} 아래로 이동`} className="rounded-lg px-2 py-1 text-slate-500 disabled:opacity-30" disabled={pending || index === typedGroups.length - 1} onClick={() => run(() => actions.moveAction(group.id, "down", type, orderedIds))} type="button">↓</button>
-                    <button aria-label={`${group.name} 수정`} className="rounded-lg px-2 py-1 text-xs font-bold text-emerald-700 disabled:opacity-30" disabled={pending} onClick={() => setEditor(group)} type="button">수정</button>
+                    <button aria-label={`${group.name} 위로 이동`} className="rounded-lg px-2 py-1 text-slate-500 disabled:opacity-30" disabled={busy || index === 0} onClick={() => run(() => actions.moveAction(group.id, "up", type, orderedIds))} type="button">↑</button>
+                    <button aria-label={`${group.name} 아래로 이동`} className="rounded-lg px-2 py-1 text-slate-500 disabled:opacity-30" disabled={busy || index === typedGroups.length - 1} onClick={() => run(() => actions.moveAction(group.id, "down", type, orderedIds))} type="button">↓</button>
+                    <button aria-label={`${group.name} 수정`} className="rounded-lg px-2 py-1 text-xs font-bold text-emerald-700 disabled:opacity-30" disabled={busy} onClick={() => setEditor(group)} type="button">수정</button>
                     <button
                       aria-label={`${group.name} 삭제`}
                       className="rounded-lg px-2 py-1 text-xs font-bold text-rose-600 disabled:opacity-30"
-                      disabled={pending}
+                      disabled={busy}
                       onClick={() => {
                         if (window.confirm(`${group.name} 그룹을 삭제할까요? 상세 분류와 거래는 유지됩니다.`)) {
                           run(() => actions.deleteAction(group.id));

@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor, within } from "@testing-library/react";
+import { act, cleanup, render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
@@ -280,9 +280,50 @@ describe("SettingsScreen", () => {
     await user.click(within(region).getByRole("button", { name: "그룹 저장" }));
     expect(await within(region).findByRole("alert")).toHaveTextContent("같은 이름의 통계 그룹이 있어요.");
     expect(within(region).getByLabelText("그룹 이름")).toHaveValue("고정지출");
+    await waitFor(() => expect(within(region).getByRole("button", { name: "통계 그룹 추가" })).toBeEnabled());
+
+    await act(async () => {
+      await user.click(within(region).getByRole("button", { name: "그룹 저장" }));
+    });
+    await waitFor(() => expect(within(region).queryByLabelText("그룹 이름")).not.toBeInTheDocument());
+  });
+
+  it("disables group controls and fields while a save is pending and restores them on failure", async () => {
+    const user = userEvent.setup();
+    let finish!: (state: SettingsActionState) => void;
+    const pending = new Promise<SettingsActionState>((resolve) => { finish = resolve; });
+    renderScreen({
+      statisticsGroupActions: {
+        createAction: () => pending,
+        updateAction: async () => ({ status: "success" }),
+        deleteAction: successChangeAction,
+        moveAction: successChangeAction,
+      },
+    });
+    const region = screen.getByRole("region", { name: "통계 그룹 관리" });
+
+    await user.click(within(region).getByRole("button", { name: "통계 그룹 추가" }));
+    const controls = [
+      within(region).getByRole("button", { name: "지출 그룹" }),
+      within(region).getByRole("button", { name: "수입 그룹" }),
+      within(region).getByRole("button", { name: "통계 그룹 추가" }),
+      within(region).getByRole("button", { name: "고정지출 아래로 이동" }),
+      within(region).getByRole("button", { name: "고정지출 수정" }),
+      within(region).getByRole("button", { name: "고정지출 삭제" }),
+      within(region).getByRole("button", { name: "편집 취소" }),
+      within(region).getByLabelText("그룹 이름"),
+      within(region).getByRole("button", { name: "#F97316 색상 선택" }),
+      within(region).getByLabelText("연금저축"),
+    ];
 
     await user.click(within(region).getByRole("button", { name: "그룹 저장" }));
-    await waitFor(() => expect(within(region).queryByLabelText("그룹 이름")).not.toBeInTheDocument());
+    await waitFor(() => controls.forEach((control) => expect(control).toBeDisabled()));
+    expect(within(region).getByRole("button", { name: "처리 중…" })).toBeDisabled();
+
+    finish({ status: "error", message: "통계 그룹을 저장하지 못했습니다." });
+    expect(await within(region).findByRole("alert")).toHaveTextContent("통계 그룹을 저장하지 못했습니다.");
+    await waitFor(() => controls.forEach((control) => expect(control).toBeEnabled()));
+    expect(within(region).getByRole("button", { name: "그룹 저장" })).toBeEnabled();
   });
 
   it("shows group membership to members without owner controls", () => {
