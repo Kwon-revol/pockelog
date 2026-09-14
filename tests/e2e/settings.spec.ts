@@ -66,7 +66,8 @@ async function createExpenseGroup(page: Page, name: string, categoryNames: strin
     await manager.getByLabel(categoryName, { exact: true }).check();
   }
   await manager.getByRole("button", { name: "그룹 저장" }).click();
-  await expect(manager.getByRole("status")).toContainText("통계 그룹을 추가했어요");
+  await expect(manager.getByLabel("그룹 이름")).toHaveCount(0);
+  await expect(manager.getByRole("button", { name: `${name} 수정` })).toBeVisible();
 }
 
 async function addExpense(
