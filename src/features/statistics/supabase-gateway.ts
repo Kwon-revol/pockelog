@@ -9,7 +9,7 @@ import {
   StatisticsQueryError,
   type StatisticsGateway,
 } from "@/features/statistics/workflows";
-import { getInitialTransactionPageForCurrentUser } from "@/features/transactions/queries";
+import { getDailyBalances, getInitialTransactionPageForCurrentUser } from "@/features/transactions/queries";
 import { resolveTransactionContext } from "@/features/transactions/supabase-gateway";
 import { createServerClient } from "@/shared/supabase/server";
 
@@ -88,6 +88,10 @@ export async function createSupabaseStatisticsGateway(): Promise<StatisticsGatew
 
     getTransactionPage(filters) {
       return getInitialTransactionPageForCurrentUser(filters);
+    },
+
+    getDailyBalances(ledgerId, filters) {
+      return getDailyBalances(supabase, ledgerId, filters);
     },
   };
 }

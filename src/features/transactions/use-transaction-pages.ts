@@ -28,6 +28,7 @@ export async function fetchTransactionPage(
   });
   if (cursor) params.set("cursor", cursor);
   if (filters.categoryId) params.set("category", filters.categoryId);
+  if (filters.statisticsGroupId) params.set("group", filters.statisticsGroupId);
   for (const id of filters.categoryIds ?? []) params.append("categories", id);
   const response = await fetch(`/api/transactions?${params}`);
   if (response.status === 401) throw new SessionExpiredError("로그인이 필요합니다.");

@@ -25,6 +25,7 @@ export type TransactionFilters = {
   type: TransactionType | "all";
   categoryId: string | null;
   categoryIds?: string[];
+  statisticsGroupId?: string;
   sort: TransactionSort;
 };
 
@@ -54,6 +55,7 @@ export type TransactionListItem = {
 export type TransactionPage = {
   items: TransactionListItem[];
   nextCursor: string | null;
+  dailyBalances?: DailyBalance[];
 };
 
 export type TransactionSummary = {

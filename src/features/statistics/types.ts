@@ -1,5 +1,6 @@
 import type { LedgerPeriod } from "@/features/transactions/period";
 import type {
+  DailyBalance,
   TransactionFilters,
   TransactionPage,
   TransactionType,
@@ -60,4 +61,5 @@ export type StatisticsDetailData = {
   typeTotal: number;
   filters: TransactionFilters;
   page: TransactionPage;
+  dailyBalances: DailyBalance[];
 };

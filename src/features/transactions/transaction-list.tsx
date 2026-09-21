@@ -59,6 +59,7 @@ export function TransactionList({
           <div key={group.date}>
             {dailyBalances ? (
               <div className="mb-2 flex items-center justify-between gap-3 text-sm font-bold" data-testid={`daily-balance-${group.date}`}>
+                <h2 className="shrink-0 text-slate-500">{dateLabel(group.date)}</h2>
                 <span className={
                   (balancesByDate.get(group.date) ?? 0) > 0 ? "text-emerald-700"
                     : (balancesByDate.get(group.date) ?? 0) < 0 ? "text-rose-600" : "text-slate-500"
@@ -66,7 +67,6 @@ export function TransactionList({
                   {(balancesByDate.get(group.date) ?? 0) > 0 ? "+" : (balancesByDate.get(group.date) ?? 0) < 0 ? "−" : ""}
                   {won.format(Math.abs(balancesByDate.get(group.date) ?? 0))}원
                 </span>
-                <h2 className="shrink-0 text-slate-500">{dateLabel(group.date)}</h2>
               </div>
             ) : (
               <h2 className="mb-2 text-sm font-bold text-slate-500">{dateLabel(group.date)}</h2>

@@ -121,7 +121,8 @@ describe("LedgerScreen", () => {
     const dateHeader = screen.getByTestId("daily-balance-2026-08-26");
     expect(dateHeader).toHaveTextContent("+2,800,000원");
     expect(dateHeader).toHaveTextContent("8월 26일");
-    expect(dateHeader.firstElementChild).toHaveTextContent("+2,800,000원");
+    expect(dateHeader.firstElementChild).toHaveTextContent("8월 26일");
+    expect(dateHeader.lastElementChild).toHaveTextContent("+2,800,000원");
   });
 
   it("opens a native modal and prevents its scroll from reaching the ledger", async () => {

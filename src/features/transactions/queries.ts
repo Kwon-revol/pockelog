@@ -52,7 +52,7 @@ async function listTransactions(
   const ascending = filters.sort === "oldest";
   let query = supabase
     .from("transactions")
-    .select("id,type,occurred_on,description,amount,memo,created_by,created_at,category:categories!transactions_category_id_fkey(id,name,color,type,system_code)")
+    .select(`id,type,occurred_on,description,amount,memo,created_by,created_at,category:categories!transactions_category_id_fkey${filters.statisticsGroupId ? "!inner" : ""}(id,name,color,type,system_code)`)
     .eq("ledger_id", ledgerId)
     .gte("occurred_on", filters.startOn)
     .lt("occurred_on", filters.endExclusive)
@@ -65,6 +65,7 @@ async function listTransactions(
   if (filters.type !== "all") query = query.eq("type", filters.type);
   if (filters.categoryId) query = query.eq("category_id", filters.categoryId);
   if (filters.categoryIds?.length) query = query.in("category_id", filters.categoryIds);
+  if (filters.statisticsGroupId) query = query.eq("category.statistics_group_id", filters.statisticsGroupId);
   if (filters.query) {
     const term = sanitizeSearchTerm(filters.query);
     if (term) query = query.or(`description.ilike.%${term}%,memo.ilike.%${term}%`);
@@ -109,18 +110,26 @@ async function getSummary(
   };
 }
 
-async function getDailyBalances(
+export async function getDailyBalances(
   supabase: ServerClient,
   ledgerId: string,
   filters: TransactionFilters,
 ): Promise<DailyBalance[]> {
-  const { data, error } = await supabase.rpc("get_transaction_daily_balances", {
+  const grouped = Boolean(filters.categoryIds?.length);
+  const byGroup = Boolean(filters.statisticsGroupId);
+  const { data, error } = await supabase.rpc(byGroup
+    ? "get_transaction_daily_balances_for_group"
+    : grouped ? "get_transaction_daily_balances_for_categories" : "get_transaction_daily_balances", {
     target_ledger_id: ledgerId,
     start_on: filters.startOn,
     end_exclusive: filters.endExclusive,
     search_term: sanitizeSearchTerm(filters.query),
     target_type: filters.type === "all" ? null : filters.type,
-    target_category_id: filters.categoryId,
+    ...(byGroup
+      ? { target_group_id: filters.statisticsGroupId }
+      : grouped
+      ? { target_category_ids: filters.categoryIds }
+      : { target_category_id: filters.categoryId }),
   });
   if (error) throw new TransactionQueryError("날짜별 합계를 불러오지 못했습니다.");
   return ((data ?? []) as Array<{ occurred_on: string; balance: number | string }>).map((row) => ({
@@ -251,7 +260,14 @@ export async function getTransactionPageForCurrentUser(
   const context = await resolveTransactionContext(supabase);
   if (!context) throw new TransactionAuthenticationError("로그인이 필요합니다.");
   const ledger = await getLedger(supabase, context.ledgerId);
-  return listTransactions(supabase, context.ledgerId, filters, cursor, context.userId, ledger.ownerId, ledger.kind);
+  if (cursor) {
+    return listTransactions(supabase, context.ledgerId, filters, cursor, context.userId, ledger.ownerId, ledger.kind);
+  }
+  const [page, dailyBalances] = await Promise.all([
+    listTransactions(supabase, context.ledgerId, filters, null, context.userId, ledger.ownerId, ledger.kind),
+    getDailyBalances(supabase, context.ledgerId, filters),
+  ]);
+  return { ...page, dailyBalances };
 }
 
 export async function getInitialTransactionPageForCurrentUser(

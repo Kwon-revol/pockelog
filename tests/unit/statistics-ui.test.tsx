@@ -70,6 +70,7 @@ const detailFixture: StatisticsDetailData = {
     },
   ],
   typeTotal: 800000,
+  dailyBalances: [{ occurredOn: "2026-08-26", balance: -800000 }],
   filters: {
     startOn: "2026-08-10",
     endOn: "2026-09-09",
@@ -207,6 +208,9 @@ describe("StatisticsDetailScreen", () => {
     expect(screen.getByRole("link", { name: "수입" })).toHaveAttribute("href", "?type=income");
     expect(screen.getByRole("region", { name: "거래 내역" })).toBeVisible();
     expect(screen.queryByRole("button", { name: /점심/ })).not.toBeInTheDocument();
+    const dateHeader = screen.getByTestId("daily-balance-2026-08-26");
+    expect(dateHeader.firstElementChild).toHaveTextContent("8월 26일");
+    expect(dateHeader.lastElementChild).toHaveTextContent("−800,000원");
   });
 
   it("filters source transactions by a category and restores all transactions", async () => {
@@ -217,13 +221,14 @@ describe("StatisticsDetailScreen", () => {
       description: "월세",
       category: { ...detailFixture.page.items[0].category, id: "housing", name: "주거비" },
     };
-    const loadPage = vi.fn(async () => ({ items: [housingItem], nextCursor: null }));
+    const loadPage = vi.fn(async () => ({ items: [housingItem], nextCursor: null, dailyBalances: [{ occurredOn: "2026-08-26", balance: -500000 }] }));
     render(<StatisticsDetailScreen initialData={detailFixture} loadPage={loadPage} />);
     await user.click(screen.getByRole("button", { name: "고정지출 하위 분류 펼치기" }));
     await user.click(screen.getByRole("button", { name: /주거비.*500,000원/ }));
 
     await waitFor(() => expect(screen.getAllByText("월세").length).toBeGreaterThan(0));
     expect(screen.queryByText("점심")).not.toBeInTheDocument();
+    expect(screen.getByTestId("daily-balance-2026-08-26")).toHaveTextContent("−500,000원");
     expect(loadPage).toHaveBeenCalledWith(expect.objectContaining({ categoryId: "housing" }), "");
     await user.click(screen.getByRole("button", { name: "전체 보기" }));
     expect(screen.getAllByText("점심").length).toBeGreaterThan(0);
@@ -245,16 +250,17 @@ describe("StatisticsDetailScreen", () => {
     const first = { ...detailFixture.page.items[0], description: "월세", category: { ...detailFixture.page.items[0].category, id: "housing" } };
     const second = { ...first, id: "55555555-5555-4555-8555-555555555555", description: "전화요금" };
     const loadPage = vi.fn()
-      .mockResolvedValueOnce({ items: [first], nextCursor: "cursor-2" })
+      .mockResolvedValueOnce({ items: [first], nextCursor: "cursor-2", dailyBalances: [{ occurredOn: "2026-08-26", balance: -600000 }] })
       .mockResolvedValueOnce({ items: [second], nextCursor: null });
     render(<StatisticsDetailScreen initialData={detailFixture} loadPage={loadPage} />);
     await user.click(screen.getByRole("button", { name: /고정지출.*600,000원/ }));
     await waitFor(() => expect(screen.getAllByText("월세").length).toBeGreaterThan(0));
-    expect(loadPage).toHaveBeenCalledWith(expect.objectContaining({ categoryIds: ["housing", "phone"] }), "");
+    expect(loadPage).toHaveBeenCalledWith(expect.objectContaining({ statisticsGroupId: "fixed" }), "");
+    expect(screen.getByTestId("daily-balance-2026-08-26")).toHaveTextContent("−600,000원");
 
     await act(async () => observerCallback?.([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver));
     await waitFor(() => expect(screen.getAllByText("전화요금").length).toBeGreaterThan(0));
-    expect(loadPage).toHaveBeenLastCalledWith(expect.objectContaining({ categoryIds: ["housing", "phone"] }), "cursor-2");
+    expect(loadPage).toHaveBeenLastCalledWith(expect.objectContaining({ statisticsGroupId: "fixed" }), "cursor-2");
   });
 
   it("loads the next source page once when the sentinel enters view", async () => {
@@ -283,6 +289,7 @@ describe("StatisticsDetailScreen", () => {
       ...detailFixture,
       type: "income",
       typeTotal: 100000,
+      dailyBalances: [{ occurredOn: "2026-08-26", balance: 100000 }],
       filters: { ...detailFixture.filters, type: "income" },
       breakdown: [{
         kind: "category",
@@ -304,5 +311,6 @@ describe("StatisticsDetailScreen", () => {
 
     expect(screen.queryByText("점심")).not.toBeInTheDocument();
     expect(screen.getAllByText("프로젝트 수입").length).toBeGreaterThan(0);
+    expect(screen.getByTestId("daily-balance-2026-08-26")).toHaveTextContent("+100,000원");
   });
 });

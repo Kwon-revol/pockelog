@@ -19,7 +19,15 @@ export function parseTransactionPageParams(params: URLSearchParams) {
   }
 
   const categoryIds = params.getAll("categories");
-  if (categoryIds.length > 100 || categoryIds.some((id) => !z.uuid().safeParse(id).success)) {
+  const groupId = params.get("group");
+  if (
+    categoryIds.length > 100
+    || categoryIds.some((id) => !z.uuid().safeParse(id).success)
+    || params.getAll("category").length > 1
+    || params.getAll("group").length > 1
+    || (groupId !== null && !z.uuid().safeParse(groupId).success)
+    || Number(Boolean(params.get("category"))) + Number(categoryIds.length > 0) + Number(groupId !== null) > 1
+  ) {
     return invalid;
   }
 
@@ -34,6 +42,7 @@ export function parseTransactionPageParams(params: URLSearchParams) {
         endExclusive: addDays(endOn, 1),
       }),
       ...(categoryIds.length ? { categoryIds: [...new Set(categoryIds)] } : {}),
+      ...(groupId ? { statisticsGroupId: groupId } : {}),
     },
   };
 }

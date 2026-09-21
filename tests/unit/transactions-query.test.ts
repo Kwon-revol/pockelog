@@ -17,7 +17,7 @@ import {
   sanitizeSearchTerm,
   toTransactionPage,
 } from "@/features/transactions/query-utils";
-import { getLedgerPageData } from "@/features/transactions/queries";
+import { getLedgerPageData, getTransactionPageForCurrentUser } from "@/features/transactions/queries";
 
 const editorTransactionId = "77777777-7777-4777-8777-777777777777";
 
@@ -89,6 +89,7 @@ function ledgerPageClient(categories: Array<{
       rpc: vi.fn().mockResolvedValue({ data: [{ income_total: 0, expense_total: 0, balance: 0 }], error: null }),
     },
     editorQuery: editorQuery as typeof editorQuery & { maybeSingle: ReturnType<typeof vi.fn> },
+    listQuery,
   };
 }
 
@@ -99,6 +100,41 @@ const cursor = {
 };
 
 describe("transaction query boundaries", () => {
+  it("returns full-day balances only with a new filtered first page", async () => {
+    const fake = ledgerPageClient();
+    fake.client.rpc.mockResolvedValue({ data: [{ occurred_on: "2026-08-26", balance: "-600000" }], error: null });
+    serverMocks.createServerClient.mockResolvedValue(fake.client);
+    serverMocks.resolveTransactionContext.mockResolvedValue({ userId: "user-1", ledgerId: "ledger-1" });
+    const filters = {
+      startOn: "2026-08-01", endOn: "2026-08-31", endExclusive: "2026-09-01",
+      query: "", type: "expense" as const, categoryId: null, sort: "newest" as const,
+      categoryIds: ["11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"],
+    };
+
+    const page = await getTransactionPageForCurrentUser(filters, "");
+    expect(page.dailyBalances).toEqual([{ occurredOn: "2026-08-26", balance: -600000 }]);
+    expect(fake.client.rpc).toHaveBeenCalledWith("get_transaction_daily_balances_for_categories", expect.objectContaining({
+      target_category_ids: filters.categoryIds,
+    }));
+  });
+  it("filters a statistics group on the server and loads its matching daily balances", async () => {
+    const fake = ledgerPageClient();
+    fake.client.rpc.mockResolvedValue({ data: [{ occurred_on: "2026-08-26", balance: "-600000" }], error: null });
+    serverMocks.createServerClient.mockResolvedValue(fake.client);
+    serverMocks.resolveTransactionContext.mockResolvedValue({ userId: "user-1", ledgerId: "ledger-1" });
+    const filters = {
+      startOn: "2026-08-01", endOn: "2026-08-31", endExclusive: "2026-09-01",
+      query: "", type: "expense" as const, categoryId: null, sort: "newest" as const,
+      statisticsGroupId: "11111111-1111-4111-8111-111111111111",
+    };
+    const page = await getTransactionPageForCurrentUser(filters, "");
+    expect(page.dailyBalances).toEqual([{ occurredOn: "2026-08-26", balance: -600000 }]);
+    expect(fake.listQuery.select).toHaveBeenCalledWith(expect.stringContaining("categories!transactions_category_id_fkey!inner"));
+    expect(fake.listQuery.eq).toHaveBeenCalledWith("category.statistics_group_id", filters.statisticsGroupId);
+    expect(fake.client.rpc).toHaveBeenCalledWith("get_transaction_daily_balances_for_group", expect.objectContaining({
+      target_group_id: filters.statisticsGroupId,
+    }));
+  });
   it("uses the new creator RPC only for shared ledgers", () => {
     expect(getCreatorProfileSource("personal")).toBe("profiles");
     expect(getCreatorProfileSource("shared")).toBe("rpc");

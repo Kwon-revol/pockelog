@@ -24,6 +24,7 @@ import {
 import { createSupabaseStatisticsGateway } from "@/features/statistics/supabase-gateway";
 import { statisticsDetailPath } from "@/features/statistics/routing";
 import type { LedgerPeriod } from "@/features/transactions/period";
+import type { TransactionFilters } from "@/features/transactions/types";
 import type { GroupedCategoryStatisticsRow } from "@/features/statistics/types";
 
 const periods: LedgerPeriod[] = [
@@ -58,6 +59,7 @@ function gateway(overrides: Partial<StatisticsGateway> = {}): StatisticsGateway 
       },
     ],
     getTransactionPage: async () => emptyPage,
+    getDailyBalances: async () => [{ occurredOn: "2026-08-26", balance: -800000 }],
     ...overrides,
   };
 }
@@ -353,6 +355,41 @@ describe("statistics loading workflows", () => {
     });
     expect(result).not.toHaveProperty("categories");
     expect(result.filters).toMatchObject({ startOn: "2026-08-10", endExclusive: "2026-09-10", type: "expense" });
+    expect(result.dailyBalances).toEqual([{ occurredOn: "2026-08-26", balance: -800000 }]);
+  });
+
+  it("loads daily amounts for the selected period and transaction type", async () => {
+    const filters: TransactionFilters = {
+      startOn: "2026-08-10", endOn: "2026-09-09", endExclusive: "2026-09-10",
+      query: "", type: "expense", categoryId: null, sort: "newest",
+      categoryIds: ["11111111-1111-4111-8111-111111111111", "22222222-2222-4222-8222-222222222222"],
+    };
+    const rpc = vi.fn().mockResolvedValue({ data: [{ occurred_on: "2026-08-26", balance: "-600000" }], error: null });
+    mocks.createServerClient.mockResolvedValue({ rpc });
+    const supabaseGateway = await createSupabaseStatisticsGateway();
+
+    await expect(supabaseGateway.getDailyBalances("ledger-1", filters))
+      .resolves.toEqual([{ occurredOn: "2026-08-26", balance: -600000 }]);
+    expect(rpc).toHaveBeenCalledWith("get_transaction_daily_balances_for_categories", {
+      target_ledger_id: "ledger-1", start_on: "2026-08-10", end_exclusive: "2026-09-10",
+      search_term: "", target_type: "expense", target_category_ids: filters.categoryIds,
+    });
+  });
+
+  it("loads daily amounts for a statistics group without sending its category IDs", async () => {
+    const filters: TransactionFilters = {
+      startOn: "2026-08-10", endOn: "2026-09-09", endExclusive: "2026-09-10",
+      query: "", type: "expense", categoryId: null, sort: "newest",
+      statisticsGroupId: "11111111-1111-4111-8111-111111111111",
+    };
+    const rpc = vi.fn().mockResolvedValue({ data: [{ occurred_on: "2026-08-26", balance: "-600000" }], error: null });
+    mocks.createServerClient.mockResolvedValue({ rpc });
+    const supabaseGateway = await createSupabaseStatisticsGateway();
+    await expect(supabaseGateway.getDailyBalances("ledger-1", filters))
+      .resolves.toEqual([{ occurredOn: "2026-08-26", balance: -600000 }]);
+    expect(rpc).toHaveBeenCalledWith("get_transaction_daily_balances_for_group", expect.objectContaining({
+      target_group_id: filters.statisticsGroupId,
+    }));
   });
 
   it("rejects a period key that does not match the ledger start day", async () => {

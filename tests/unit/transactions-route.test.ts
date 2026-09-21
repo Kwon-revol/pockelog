@@ -73,6 +73,40 @@ describe("transaction page route contract", () => {
     ))).toMatchObject({ ok: false });
   });
 
+  it("accepts a group ID and rejects overlapping category filters", () => {
+    const base = "start=2026-08-01&end=2026-08-31";
+    const group = "11111111-1111-4111-8111-111111111111";
+    const category = "22222222-2222-4222-8222-222222222222";
+    expect(parseTransactionPageParams(new URLSearchParams(`${base}&group=${group}`)))
+      .toMatchObject({ ok: true, filters: { statisticsGroupId: group } });
+    expect(parseTransactionPageParams(new URLSearchParams(`${base}&group=invalid`))).toMatchObject({ ok: false });
+    expect(parseTransactionPageParams(new URLSearchParams(`${base}&category=${category}&categories=${group}`)))
+      .toMatchObject({ ok: false });
+    expect(parseTransactionPageParams(new URLSearchParams(`${base}&category=${category}&group=${group}`)))
+      .toMatchObject({ ok: false });
+    expect(parseTransactionPageParams(new URLSearchParams(`${base}&category=&category=${category}&group=${group}`)))
+      .toMatchObject({ ok: false });
+    expect(parseTransactionPageParams(new URLSearchParams(`${base}&group=${group}&group=${category}`)))
+      .toMatchObject({ ok: false });
+  });
+
+  it("carries a group ID into initial and later page requests", async () => {
+    const fetchedUrls: string[] = [];
+    vi.stubGlobal("fetch", vi.fn(async (url: string) => {
+      fetchedUrls.push(url);
+      return { ok: true, status: 200, json: async () => ({ items: [], nextCursor: null }) };
+    }));
+    const filters = {
+      startOn: "2026-08-01", endOn: "2026-08-31", endExclusive: "2026-09-01",
+      query: "", type: "expense" as const, categoryId: null, sort: "newest" as const,
+      statisticsGroupId: "11111111-1111-4111-8111-111111111111",
+    };
+    await fetchTransactionPage(filters, "");
+    await fetchTransactionPage(filters, "cursor-2");
+    expect(fetchedUrls.map((url) => new URL(url, "https://example.com").searchParams.get("group")))
+      .toEqual([filters.statisticsGroupId, filters.statisticsGroupId]);
+  });
+
   it("carries the same category group filter into the initial and next page requests", async () => {
     const fetchedUrls: string[] = [];
     const fetcher = vi.fn(async (url: string) => {

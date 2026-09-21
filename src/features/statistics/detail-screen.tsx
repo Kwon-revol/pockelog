@@ -11,7 +11,7 @@ import type {
 } from "@/features/statistics/types";
 import { statisticsDetailPath } from "@/features/statistics/routing";
 import { TransactionList } from "@/features/transactions/transaction-list";
-import type { TransactionFilters, TransactionPage } from "@/features/transactions/types";
+import type { DailyBalance, TransactionFilters, TransactionPage } from "@/features/transactions/types";
 import {
   fetchTransactionPage,
   SessionExpiredError,
@@ -67,7 +67,7 @@ function StatisticsGroupRow({
   expanded: boolean;
   group: StatisticsGroupSummary;
   onToggle: () => void;
-  onSelect: (key: string, label: string, categoryIds: string[]) => void;
+  onSelect: (key: string, label: string, filter: { categoryId?: string; statisticsGroupId?: string }) => void;
   selectedKey: string | null;
 }) {
   const detailsId = `statistics-group-${group.groupId}`;
@@ -75,7 +75,7 @@ function StatisticsGroupRow({
     <article>
       <div className="mb-2 flex items-center gap-2">
         <button aria-controls={detailsId} aria-expanded={expanded} aria-label={`${group.name} 하위 분류 ${expanded ? "접기" : "펼치기"}`} className="flex size-6 shrink-0 items-center justify-center rounded-md text-xs font-black text-slate-500" onClick={onToggle} type="button">{expanded ? "▾" : "▸"}</button>
-        <button aria-pressed={selectedKey === `group:${group.groupId}`} className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg text-left text-sm ${selectedKey === `group:${group.groupId}` ? "bg-emerald-50" : ""}`} onClick={() => onSelect(`group:${group.groupId}`, group.name, group.categories.map((category) => category.categoryId))} type="button">
+        <button aria-pressed={selectedKey === `group:${group.groupId}`} className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg text-left text-sm ${selectedKey === `group:${group.groupId}` ? "bg-emerald-50" : ""}`} onClick={() => onSelect(`group:${group.groupId}`, group.name, { statisticsGroupId: group.groupId })} type="button">
           <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: group.color }} />
           <span className="min-w-0 flex-1 truncate font-black text-slate-900">{group.name}</span>
           <span className="font-bold text-slate-600">{won.format(group.amountTotal)}원</span>
@@ -86,7 +86,7 @@ function StatisticsGroupRow({
       {expanded ? (
         <div className="ml-5 mt-4 space-y-4 border-l border-slate-200 pl-4" id={detailsId}>
           {group.categories.map((category) => (
-            <CategoryBreakdownRow category={category} key={category.categoryId} onSelect={() => onSelect(`category:${category.categoryId}`, category.name, [category.categoryId])} selected={selectedKey === `category:${category.categoryId}`} />
+            <CategoryBreakdownRow category={category} key={category.categoryId} onSelect={() => onSelect(`category:${category.categoryId}`, category.name, { categoryId: category.categoryId })} selected={selectedKey === `category:${category.categoryId}`} />
           ))}
         </div>
       ) : null}
@@ -143,14 +143,12 @@ function StatisticsDetailContent({
     }
   }
 
-  function selectTransactions(key: string, label: string, categoryIds: string[]) {
+  function selectTransactions(key: string, label: string, filter: { categoryId?: string; statisticsGroupId?: string }) {
     if (selection?.key === key) {
       clearSelection();
       return;
     }
-    const filters: TransactionFilters = categoryIds.length === 1
-      ? { ...initialData.filters, categoryId: categoryIds[0] }
-      : { ...initialData.filters, categoryIds };
+    const filters: TransactionFilters = { ...initialData.filters, ...filter };
     void loadSelection({ key, label, filters });
   }
 
@@ -196,7 +194,7 @@ function StatisticsDetailContent({
                   selectedKey={selection?.key ?? null}
                 />
               ) : (
-                <CategoryBreakdownRow category={item.category} key={item.category.categoryId} onSelect={() => selectTransactions(`category:${item.category.categoryId}`, item.category.name, [item.category.categoryId])} selected={selection?.key === `category:${item.category.categoryId}`} />
+                <CategoryBreakdownRow category={item.category} key={item.category.categoryId} onSelect={() => selectTransactions(`category:${item.category.categoryId}`, item.category.name, { categoryId: item.category.categoryId })} selected={selection?.key === `category:${item.category.categoryId}`} />
               )
             ))}
           </div>
@@ -219,6 +217,7 @@ function StatisticsDetailContent({
             key={selection?.key ?? "all"}
             loadPage={loadPage}
             page={selectedPage ?? initialData.page}
+            dailyBalances={selection ? selectedPage?.dailyBalances : initialData.dailyBalances}
             typeLabel={typeLabel}
           />
         ) : null}
@@ -231,17 +230,19 @@ function StatisticsTransactionResults({
   filters,
   loadPage,
   page,
+  dailyBalances,
   typeLabel,
 }: {
   filters: TransactionFilters;
   loadPage?: LoadTransactionPage;
   page: TransactionPage;
+  dailyBalances?: DailyBalance[];
   typeLabel: string;
 }) {
   const pages = useTransactionPages(page, filters, loadPage);
   return pages.items.length === 0 ? (
     <div className="rounded-3xl border border-slate-200 bg-white px-6 py-12 text-center text-sm font-bold text-slate-400">해당 기간의 {typeLabel} 내역이 없습니다.</div>
   ) : (
-    <TransactionList items={pages.items} hasNext={pages.hasNext} loading={pages.loading} error={pages.loadError} sentinelRef={pages.sentinelRef} onRetry={() => void pages.requestNextPage()} />
+    <TransactionList items={pages.items} dailyBalances={dailyBalances} hasNext={pages.hasNext} loading={pages.loading} error={pages.loadError} sentinelRef={pages.sentinelRef} onRetry={() => void pages.requestNextPage()} />
   );
 }

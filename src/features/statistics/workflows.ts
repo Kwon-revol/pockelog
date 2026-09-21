@@ -14,6 +14,7 @@ import {
   type LedgerPeriod,
 } from "@/features/transactions/period";
 import type {
+  DailyBalance,
   TransactionFilters,
   TransactionPage,
   TransactionType,
@@ -33,6 +34,7 @@ export interface StatisticsGateway {
     type: TransactionType,
   ): Promise<GroupedCategoryStatisticsRow[]>;
   getTransactionPage(filters: TransactionFilters): Promise<TransactionPage>;
+  getDailyBalances(ledgerId: string, filters: TransactionFilters): Promise<DailyBalance[]>;
 }
 
 export class StatisticsAuthenticationError extends Error {}
@@ -84,10 +86,11 @@ export async function loadStatisticsDetail(
   };
 
   try {
-    const [periodRows, categoryRows, page] = await Promise.all([
+    const [periodRows, categoryRows, page, dailyBalances] = await Promise.all([
       gateway.getPeriodRows(context.ledger.id, [period]),
       gateway.getCategoryRows(context.ledger.id, period, type),
       gateway.getTransactionPage(filters),
+      gateway.getDailyBalances(context.ledger.id, filters),
     ]);
     const summary = toPeriodSummaries(periodRows, [period])[0];
     const typeTotal = type === "expense" ? summary.expenseTotal : summary.incomeTotal;
@@ -99,6 +102,7 @@ export async function loadStatisticsDetail(
       typeTotal,
       filters,
       page,
+      dailyBalances,
     };
   } catch (error) {
     if (error instanceof StatisticsQueryError) throw error;
