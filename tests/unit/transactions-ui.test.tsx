@@ -45,6 +45,7 @@ const fixture: LedgerPageData = {
     nextCursor: null,
   },
   summary: { incomeTotal: 2800000, expenseTotal: 46500, balance: 2753500 },
+  dailyBalances: [{ occurredOn: "2026-08-26", balance: -46500 }],
   initialEditorItem: null,
   initialCategoryId: null,
 };
@@ -101,6 +102,26 @@ describe("LedgerScreen", () => {
     expect(screen.getAllByRole("button", { name: /점심/ })).toHaveLength(2);
     await user.click(screen.getAllByRole("button", { name: "내역 추가" })[0]);
     expect(screen.getByRole("dialog", { name: "내역 추가" })).toBeVisible();
+  });
+
+  it("shows the full filtered daily net before later pages load", () => {
+    render(
+      <LedgerScreen
+        initialData={{
+          ...fixture,
+          dailyBalances: [{ occurredOn: "2026-08-26", balance: 2800000 }],
+          page: { ...fixture.page, nextCursor: "cursor-1" },
+        }}
+        createAction={successAction}
+        updateAction={successAction}
+        trashAction={successAction}
+      />,
+    );
+
+    const dateHeader = screen.getByTestId("daily-balance-2026-08-26");
+    expect(dateHeader).toHaveTextContent("+2,800,000원");
+    expect(dateHeader).toHaveTextContent("8월 26일");
+    expect(dateHeader.firstElementChild).toHaveTextContent("+2,800,000원");
   });
 
   it("opens a native modal and prevents its scroll from reaching the ledger", async () => {
@@ -384,6 +405,33 @@ describe("LedgerScreen", () => {
     await waitFor(() => expect(screen.queryByText("점심")).not.toBeInTheDocument());
     expect(screen.getByTestId("expense-total")).toHaveTextContent("0원");
     expect(screen.getByTestId("balance-total")).toHaveTextContent("2,800,000원");
+  });
+
+  it("updates a displayed day net after trashing one of its expenses", async () => {
+    const user = userEvent.setup();
+    const secondItem = {
+      ...fixture.page.items[0],
+      id: "66666666-6666-4666-8666-666666666666",
+      description: "저녁",
+      amount: 30000,
+    };
+    render(
+      <LedgerScreen
+        initialData={{
+          ...fixture,
+          page: { items: [fixture.page.items[0], secondItem], nextCursor: null },
+          dailyBalances: [{ occurredOn: "2026-08-26", balance: -76500 }],
+        }}
+        createAction={successAction}
+        updateAction={successAction}
+        trashAction={successAction}
+      />,
+    );
+
+    await user.click(screen.getAllByRole("button", { name: /점심/ })[0]);
+    await user.click(within(screen.getByRole("dialog", { name: "내역 수정" })).getByRole("button", { name: "삭제" }));
+    await waitFor(() => expect(screen.queryByText("점심")).not.toBeInTheDocument());
+    expect(screen.getByTestId("daily-balance-2026-08-26")).toHaveTextContent("−30,000원");
   });
 
   it("removes a successfully trashed income from the list and summary", async () => {

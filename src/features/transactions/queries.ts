@@ -22,6 +22,7 @@ import type {
   TransactionPage,
   TransactionListItem,
   TransactionSummary,
+  DailyBalance,
 } from "@/features/transactions/types";
 import { createServerClient } from "@/shared/supabase/server";
 import type { TaxCategoryCode } from "@/features/tax/types";
@@ -63,6 +64,7 @@ async function listTransactions(
 
   if (filters.type !== "all") query = query.eq("type", filters.type);
   if (filters.categoryId) query = query.eq("category_id", filters.categoryId);
+  if (filters.categoryIds?.length) query = query.in("category_id", filters.categoryIds);
   if (filters.query) {
     const term = sanitizeSearchTerm(filters.query);
     if (term) query = query.or(`description.ilike.%${term}%,memo.ilike.%${term}%`);
@@ -105,6 +107,26 @@ async function getSummary(
     expenseTotal: Number(row?.expense_total ?? 0),
     balance: Number(row?.balance ?? 0),
   };
+}
+
+async function getDailyBalances(
+  supabase: ServerClient,
+  ledgerId: string,
+  filters: TransactionFilters,
+): Promise<DailyBalance[]> {
+  const { data, error } = await supabase.rpc("get_transaction_daily_balances", {
+    target_ledger_id: ledgerId,
+    start_on: filters.startOn,
+    end_exclusive: filters.endExclusive,
+    search_term: sanitizeSearchTerm(filters.query),
+    target_type: filters.type === "all" ? null : filters.type,
+    target_category_id: filters.categoryId,
+  });
+  if (error) throw new TransactionQueryError("날짜별 합계를 불러오지 못했습니다.");
+  return ((data ?? []) as Array<{ occurred_on: string; balance: number | string }>).map((row) => ({
+    occurredOn: row.occurred_on,
+    balance: Number(row.balance),
+  }));
 }
 
 async function getLedger(
@@ -200,10 +222,11 @@ export async function getLedgerPageData(
     searchParams,
     getLedgerPeriod(now, ledger.periodStartDay),
   );
-  const [categories, page, summary, initialEditorItem] = await Promise.all([
+  const [categories, page, summary, dailyBalances, initialEditorItem] = await Promise.all([
     getCategories(supabase, ledger.id),
     listTransactions(supabase, ledger.id, filters, null, context.userId, ledger.ownerId, ledger.kind),
     getSummary(supabase, ledger.id, filters),
+    getDailyBalances(supabase, ledger.id, filters),
     getInitialEditorItem(supabase, searchParams.edit, ledger.id, context.userId, ledger.ownerId),
   ]);
   return {
@@ -212,6 +235,7 @@ export async function getLedgerPageData(
     filters,
     page,
     summary,
+    dailyBalances,
     initialEditorItem,
     initialCategoryId: getInitialCategoryId(searchParams.new, categories),
   };
@@ -221,8 +245,8 @@ export async function getTransactionPageForCurrentUser(
   filters: TransactionFilters,
   encodedCursor: string,
 ) {
-  const cursor = decodeCursor(encodedCursor);
-  if (!cursor) throw new TransactionQueryError("잘못된 커서입니다.");
+  const cursor = encodedCursor ? decodeCursor(encodedCursor) : null;
+  if (encodedCursor && !cursor) throw new TransactionQueryError("잘못된 커서입니다.");
   const supabase = await createServerClient();
   const context = await resolveTransactionContext(supabase);
   if (!context) throw new TransactionAuthenticationError("로그인이 필요합니다.");

@@ -22,6 +22,7 @@ describe("ledger screen server key", () => {
       },
       page: { items: [], nextCursor: null },
       summary: { incomeTotal: 0, expenseTotal: 0, balance: 0 },
+      dailyBalances: [],
       initialEditorItem: null,
       initialCategoryId: null,
     } satisfies LedgerPageData;

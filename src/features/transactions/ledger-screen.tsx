@@ -31,12 +31,16 @@ export function LedgerScreen({ initialData, createAction, updateAction, trashAct
     initialData.initialEditorItem ?? (initialData.initialCategoryId ? null : undefined),
   );
   const [summary, setSummary] = useState(initialData.summary);
+  const [dailyBalances, setDailyBalances] = useState(initialData.dailyBalances);
   const pages = useTransactionPages(initialData.page, initialData.filters, loadPage);
 
   const moveSelectedToTrash = async (item: TransactionListItem) => {
     const result = await trashAction(item.id);
     if (result.status === "success") {
       pages.removeItem(item.id);
+      setDailyBalances((current) => current.map((entry) => entry.occurredOn === item.occurredOn
+        ? { ...entry, balance: entry.balance + (item.type === "expense" ? item.amount : -item.amount) }
+        : entry));
       setSummary((current) => item.type === "expense"
         ? {
             ...current,
@@ -99,7 +103,7 @@ export function LedgerScreen({ initialData, createAction, updateAction, trashAct
           <button className="mt-6 rounded-2xl border border-emerald-200 px-5 py-3 text-sm font-bold text-emerald-700" onClick={() => setSelected(null)} type="button">내역 추가</button>
         </section>
       ) : (
-        <TransactionList items={pages.items} hasNext={pages.hasNext} loading={pages.loading} error={pages.loadError} sentinelRef={pages.sentinelRef} onEdit={setSelected} onRetry={() => void pages.requestNextPage()} showCreator={initialData.ledger.kind === "shared"} />
+        <TransactionList items={pages.items} dailyBalances={dailyBalances} hasNext={pages.hasNext} loading={pages.loading} error={pages.loadError} sentinelRef={pages.sentinelRef} onEdit={setSelected} onRetry={() => void pages.requestNextPage()} showCreator={initialData.ledger.kind === "shared"} />
       )}
 
       <button aria-label="내역 추가" className="fixed bottom-20 right-5 z-20 flex size-14 items-center justify-center rounded-full bg-emerald-600 text-3xl font-light text-white shadow-xl shadow-emerald-600/30 lg:hidden" onClick={() => setSelected(null)} type="button">+</button>

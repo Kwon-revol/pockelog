@@ -2,7 +2,7 @@
 
 import type { RefObject } from "react";
 
-import type { TransactionListItem } from "@/features/transactions/types";
+import type { DailyBalance, TransactionListItem } from "@/features/transactions/types";
 
 const won = new Intl.NumberFormat("ko-KR");
 
@@ -28,6 +28,7 @@ type TransactionListProps = {
   onEdit?: (item: TransactionListItem) => void;
   showCreator?: boolean;
   onRetry: () => void;
+  dailyBalances?: DailyBalance[];
 };
 
 export function TransactionList({
@@ -39,6 +40,7 @@ export function TransactionList({
   onEdit,
   showCreator = false,
   onRetry,
+  dailyBalances,
 }: TransactionListProps) {
   if (items.length === 0) return null;
 
@@ -48,13 +50,27 @@ export function TransactionList({
     else result.push({ date: item.occurredOn, items: [item] });
     return result;
   }, []);
+  const balancesByDate = new Map(dailyBalances?.map((entry) => [entry.occurredOn, entry.balance]));
 
   return (
     <section aria-label="거래 내역" className="space-y-4">
       <div className="space-y-5 lg:hidden">
         {groups.map((group) => (
           <div key={group.date}>
-            <h2 className="mb-2 text-sm font-bold text-slate-500">{dateLabel(group.date)}</h2>
+            {dailyBalances ? (
+              <div className="mb-2 flex items-center justify-between gap-3 text-sm font-bold" data-testid={`daily-balance-${group.date}`}>
+                <span className={
+                  (balancesByDate.get(group.date) ?? 0) > 0 ? "text-emerald-700"
+                    : (balancesByDate.get(group.date) ?? 0) < 0 ? "text-rose-600" : "text-slate-500"
+                }>
+                  {(balancesByDate.get(group.date) ?? 0) > 0 ? "+" : (balancesByDate.get(group.date) ?? 0) < 0 ? "−" : ""}
+                  {won.format(Math.abs(balancesByDate.get(group.date) ?? 0))}원
+                </span>
+                <h2 className="shrink-0 text-slate-500">{dateLabel(group.date)}</h2>
+              </div>
+            ) : (
+              <h2 className="mb-2 text-sm font-bold text-slate-500">{dateLabel(group.date)}</h2>
+            )}
             <div className="overflow-hidden rounded-3xl border border-slate-200/80 bg-white shadow-sm">
               {group.items.map((item) => {
                 const content = <>

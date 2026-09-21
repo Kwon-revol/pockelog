@@ -24,6 +24,7 @@ export type TransactionFilters = {
   query: string;
   type: TransactionType | "all";
   categoryId: string | null;
+  categoryIds?: string[];
   sort: TransactionSort;
 };
 
@@ -61,12 +62,15 @@ export type TransactionSummary = {
   balance: number;
 };
 
+export type DailyBalance = { occurredOn: string; balance: number };
+
 export type LedgerPageData = {
   ledger: { id: string; name: string; periodStartDay: number | null; kind: "personal" | "shared" };
   categories: CategoryOption[];
   filters: TransactionFilters;
   page: TransactionPage;
   summary: TransactionSummary;
+  dailyBalances: DailyBalance[];
   initialEditorItem: TransactionListItem | null;
   initialCategoryId: string | null;
 };

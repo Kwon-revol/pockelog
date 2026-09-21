@@ -1,15 +1,20 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useRouter } from "next/navigation";
+import { useRef, useState } from "react";
 
 import type {
   CategorySummary,
   StatisticsDetailData,
   StatisticsGroupSummary,
 } from "@/features/statistics/types";
+import { statisticsDetailPath } from "@/features/statistics/routing";
 import { TransactionList } from "@/features/transactions/transaction-list";
+import type { TransactionFilters, TransactionPage } from "@/features/transactions/types";
 import {
+  fetchTransactionPage,
+  SessionExpiredError,
   useTransactionPages,
   type LoadTransactionPage,
 } from "@/features/transactions/use-transaction-pages";
@@ -30,15 +35,23 @@ function RatioBar({ color, name, value }: { color: string; name: string; value: 
   );
 }
 
-function CategoryBreakdownRow({ category }: { category: CategorySummary }) {
+function CategoryBreakdownRow({
+  category,
+  onSelect,
+  selected,
+}: {
+  category: CategorySummary;
+  onSelect: () => void;
+  selected: boolean;
+}) {
   return (
     <article>
-      <div className="mb-2 flex items-center gap-2 text-sm">
+      <button aria-pressed={selected} className={`mb-2 flex w-full items-center gap-2 rounded-lg text-left text-sm ${selected ? "bg-emerald-50" : ""}`} onClick={onSelect} type="button">
         <span className="size-2.5 rounded-full" style={{ backgroundColor: category.color }} />
         <span className="min-w-0 flex-1 truncate font-black text-slate-900">{category.name}</span>
         <span className="font-bold text-slate-600">{won.format(category.amountTotal)}원</span>
         <span className="w-14 text-right text-slate-400">{ratio.format(category.ratio)}%</span>
-      </div>
+      </button>
       <RatioBar color={category.color} name={category.name} value={category.ratio} />
     </article>
   );
@@ -48,26 +61,32 @@ function StatisticsGroupRow({
   expanded,
   group,
   onToggle,
+  onSelect,
+  selectedKey,
 }: {
   expanded: boolean;
   group: StatisticsGroupSummary;
   onToggle: () => void;
+  onSelect: (key: string, label: string, categoryIds: string[]) => void;
+  selectedKey: string | null;
 }) {
   const detailsId = `statistics-group-${group.groupId}`;
   return (
     <article>
-      <button aria-controls={detailsId} aria-expanded={expanded} className="mb-2 flex w-full items-center gap-2 text-left text-sm" onClick={onToggle} type="button">
-        <span aria-hidden="true" className="w-3 text-xs font-black text-slate-400">{expanded ? "▾" : "▸"}</span>
-        <span className="size-2.5 rounded-full" style={{ backgroundColor: group.color }} />
-        <span className="min-w-0 flex-1 truncate font-black text-slate-900">{group.name}</span>
-        <span className="font-bold text-slate-600">{won.format(group.amountTotal)}원</span>
-        <span className="w-14 text-right text-slate-400">{ratio.format(group.ratio)}%</span>
-      </button>
+      <div className="mb-2 flex items-center gap-2">
+        <button aria-controls={detailsId} aria-expanded={expanded} aria-label={`${group.name} 하위 분류 ${expanded ? "접기" : "펼치기"}`} className="flex size-6 shrink-0 items-center justify-center rounded-md text-xs font-black text-slate-500" onClick={onToggle} type="button">{expanded ? "▾" : "▸"}</button>
+        <button aria-pressed={selectedKey === `group:${group.groupId}`} className={`flex min-w-0 flex-1 items-center gap-2 rounded-lg text-left text-sm ${selectedKey === `group:${group.groupId}` ? "bg-emerald-50" : ""}`} onClick={() => onSelect(`group:${group.groupId}`, group.name, group.categories.map((category) => category.categoryId))} type="button">
+          <span className="size-2.5 shrink-0 rounded-full" style={{ backgroundColor: group.color }} />
+          <span className="min-w-0 flex-1 truncate font-black text-slate-900">{group.name}</span>
+          <span className="font-bold text-slate-600">{won.format(group.amountTotal)}원</span>
+          <span className="w-14 text-right text-slate-400">{ratio.format(group.ratio)}%</span>
+        </button>
+      </div>
       <RatioBar color={group.color} name={group.name} value={group.ratio} />
       {expanded ? (
         <div className="ml-5 mt-4 space-y-4 border-l border-slate-200 pl-4" id={detailsId}>
           {group.categories.map((category) => (
-            <CategoryBreakdownRow category={category} key={category.categoryId} />
+            <CategoryBreakdownRow category={category} key={category.categoryId} onSelect={() => onSelect(`category:${category.categoryId}`, category.name, [category.categoryId])} selected={selectedKey === `category:${category.categoryId}`} />
           ))}
         </div>
       ) : null}
@@ -84,9 +103,56 @@ function StatisticsDetailContent({
   initialData,
   loadPage,
 }: StatisticsDetailScreenProps) {
-  const pages = useTransactionPages(initialData.page, initialData.filters, loadPage);
+  const router = useRouter();
   const [expandedGroupIds, setExpandedGroupIds] = useState<Set<string>>(() => new Set());
+  const [selection, setSelection] = useState<{ key: string; label: string; filters: TransactionFilters } | null>(null);
+  const [selectedPage, setSelectedPage] = useState<TransactionPage | null>(null);
+  const [filterLoading, setFilterLoading] = useState(false);
+  const [filterError, setFilterError] = useState(false);
+  const requestId = useRef(0);
   const typeLabel = initialData.type === "expense" ? "지출" : "수입";
+
+  function clearSelection() {
+    requestId.current += 1;
+    setSelection(null);
+    setSelectedPage(null);
+    setFilterLoading(false);
+    setFilterError(false);
+  }
+
+  async function loadSelection(nextSelection: { key: string; label: string; filters: TransactionFilters }) {
+    const currentRequest = ++requestId.current;
+    setSelection(nextSelection);
+    setSelectedPage(null);
+    setFilterLoading(true);
+    setFilterError(false);
+    try {
+      const page = await (loadPage ?? fetchTransactionPage)(nextSelection.filters, "");
+      if (requestId.current === currentRequest) setSelectedPage(page);
+    } catch (error) {
+      if (requestId.current === currentRequest) {
+        if (error instanceof SessionExpiredError) {
+          const next = statisticsDetailPath(initialData.period.key, initialData.type);
+          router.push(`/login?next=${encodeURIComponent(next)}`);
+        } else {
+          setFilterError(true);
+        }
+      }
+    } finally {
+      if (requestId.current === currentRequest) setFilterLoading(false);
+    }
+  }
+
+  function selectTransactions(key: string, label: string, categoryIds: string[]) {
+    if (selection?.key === key) {
+      clearSelection();
+      return;
+    }
+    const filters: TransactionFilters = categoryIds.length === 1
+      ? { ...initialData.filters, categoryId: categoryIds[0] }
+      : { ...initialData.filters, categoryIds };
+    void loadSelection({ key, label, filters });
+  }
 
   function toggleGroup(groupId: string) {
     setExpandedGroupIds((current) => {
@@ -126,9 +192,11 @@ function StatisticsDetailContent({
                   group={item}
                   key={item.groupId}
                   onToggle={() => toggleGroup(item.groupId)}
+                  onSelect={selectTransactions}
+                  selectedKey={selection?.key ?? null}
                 />
               ) : (
-                <CategoryBreakdownRow category={item.category} key={item.category.categoryId} />
+                <CategoryBreakdownRow category={item.category} key={item.category.categoryId} onSelect={() => selectTransactions(`category:${item.category.categoryId}`, item.category.name, [item.category.categoryId])} selected={selection?.key === `category:${item.category.categoryId}`} />
               )
             ))}
           </div>
@@ -137,12 +205,43 @@ function StatisticsDetailContent({
 
       <section>
         <div className="mb-4"><h2 className="text-xl font-black text-slate-950">원본 거래</h2><p className="mt-1 text-sm text-slate-500">위 통계에 포함된 {typeLabel} 내역입니다.</p></div>
-        {pages.items.length === 0 ? (
-          <div className="rounded-3xl border border-slate-200 bg-white px-6 py-12 text-center text-sm font-bold text-slate-400">해당 기간의 {typeLabel} 내역이 없습니다.</div>
-        ) : (
-          <TransactionList items={pages.items} hasNext={pages.hasNext} loading={pages.loading} error={pages.loadError} sentinelRef={pages.sentinelRef} onRetry={() => void pages.requestNextPage()} />
-        )}
+        {selection ? (
+          <div className="mb-4 flex items-center gap-3 text-sm font-bold">
+            <span className="rounded-full bg-emerald-50 px-3 py-1.5 text-emerald-800">{selection.label}</span>
+            <button className="text-slate-600 underline underline-offset-2" onClick={clearSelection} type="button">전체 보기</button>
+          </div>
+        ) : null}
+        {filterLoading ? <p aria-live="polite" className="py-8 text-center text-sm text-slate-500">내역을 불러오는 중...</p> : null}
+        {filterError ? <div className="py-8 text-center"><p role="alert" className="text-sm text-rose-600">내역을 불러오지 못했습니다.</p><button className="mt-2 rounded-xl border border-slate-200 px-4 py-2 text-sm font-bold" onClick={() => { if (selection) void loadSelection(selection); }} type="button">다시 시도</button></div> : null}
+        {!filterLoading && !filterError ? (
+          <StatisticsTransactionResults
+            filters={selection?.filters ?? initialData.filters}
+            key={selection?.key ?? "all"}
+            loadPage={loadPage}
+            page={selectedPage ?? initialData.page}
+            typeLabel={typeLabel}
+          />
+        ) : null}
       </section>
     </div>
+  );
+}
+
+function StatisticsTransactionResults({
+  filters,
+  loadPage,
+  page,
+  typeLabel,
+}: {
+  filters: TransactionFilters;
+  loadPage?: LoadTransactionPage;
+  page: TransactionPage;
+  typeLabel: string;
+}) {
+  const pages = useTransactionPages(page, filters, loadPage);
+  return pages.items.length === 0 ? (
+    <div className="rounded-3xl border border-slate-200 bg-white px-6 py-12 text-center text-sm font-bold text-slate-400">해당 기간의 {typeLabel} 내역이 없습니다.</div>
+  ) : (
+    <TransactionList items={pages.items} hasNext={pages.hasNext} loading={pages.loading} error={pages.loadError} sentinelRef={pages.sentinelRef} onRetry={() => void pages.requestNextPage()} />
   );
 }

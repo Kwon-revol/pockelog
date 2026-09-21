@@ -6,9 +6,11 @@ import { StatisticsDetailScreen } from "@/features/statistics/detail-screen";
 import { StatisticsOverviewScreen } from "@/features/statistics/overview-screen";
 import type { StatisticsDetailData, StatisticsOverviewData } from "@/features/statistics/types";
 import type { TransactionPage } from "@/features/transactions/types";
+import { SessionExpiredError } from "@/features/transactions/use-transaction-pages";
 
+const navigateTo = vi.hoisted(() => vi.fn());
 vi.mock("next/navigation", () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: navigateTo }),
 }));
 
 const overviewFixture: StatisticsOverviewData = {
@@ -136,6 +138,7 @@ describe("StatisticsOverviewScreen", () => {
 describe("StatisticsDetailScreen", () => {
   beforeEach(() => {
     observerCallback = null;
+    navigateTo.mockClear();
     vi.stubGlobal("IntersectionObserver", FakeIntersectionObserver);
   });
 
@@ -149,7 +152,7 @@ describe("StatisticsDetailScreen", () => {
     render(<StatisticsDetailScreen initialData={detailFixture} />);
     expect(screen.getByRole("heading", { name: "분류별 지출" })).toBeVisible();
     const categories = screen.getByRole("region", { name: "분류별 지출 비율" });
-    const groupButton = within(categories).getByRole("button", { name: /고정지출.*600,000원.*75%/ });
+    const groupButton = within(categories).getByRole("button", { name: "고정지출 하위 분류 펼치기" });
     expect(groupButton).toHaveAttribute("aria-expanded", "false");
     expect(within(categories).queryByText("주거비")).not.toBeInTheDocument();
     expect(within(categories).queryByText("통신비")).not.toBeInTheDocument();
@@ -196,7 +199,7 @@ describe("StatisticsDetailScreen", () => {
     expect(within(articles[1]).getByText("취미")).toBeVisible();
     expect(within(articles[1]).getByText("10,000원")).toBeVisible();
     expect(within(articles[1]).getByText("25%")).toBeVisible();
-    expect(within(categories).queryByRole("button")).not.toBeInTheDocument();
+    expect(within(categories).getAllByRole("button")).toHaveLength(2);
   });
 
   it("preserves the type switch and read-only source transactions", () => {
@@ -204,6 +207,54 @@ describe("StatisticsDetailScreen", () => {
     expect(screen.getByRole("link", { name: "수입" })).toHaveAttribute("href", "?type=income");
     expect(screen.getByRole("region", { name: "거래 내역" })).toBeVisible();
     expect(screen.queryByRole("button", { name: /점심/ })).not.toBeInTheDocument();
+  });
+
+  it("filters source transactions by a category and restores all transactions", async () => {
+    const user = userEvent.setup();
+    const housingItem = {
+      ...detailFixture.page.items[0],
+      id: "44444444-4444-4444-8444-444444444444",
+      description: "월세",
+      category: { ...detailFixture.page.items[0].category, id: "housing", name: "주거비" },
+    };
+    const loadPage = vi.fn(async () => ({ items: [housingItem], nextCursor: null }));
+    render(<StatisticsDetailScreen initialData={detailFixture} loadPage={loadPage} />);
+    await user.click(screen.getByRole("button", { name: "고정지출 하위 분류 펼치기" }));
+    await user.click(screen.getByRole("button", { name: /주거비.*500,000원/ }));
+
+    await waitFor(() => expect(screen.getAllByText("월세").length).toBeGreaterThan(0));
+    expect(screen.queryByText("점심")).not.toBeInTheDocument();
+    expect(loadPage).toHaveBeenCalledWith(expect.objectContaining({ categoryId: "housing" }), "");
+    await user.click(screen.getByRole("button", { name: "전체 보기" }));
+    expect(screen.getAllByText("점심").length).toBeGreaterThan(0);
+  });
+
+  it("returns to login when the first filtered request finds an expired session", async () => {
+    const user = userEvent.setup();
+    const loadPage = vi.fn(async () => { throw new SessionExpiredError("로그인이 필요합니다."); });
+    render(<StatisticsDetailScreen initialData={detailFixture} loadPage={loadPage} />);
+    await user.click(screen.getByRole("button", { name: /고정지출.*600,000원/ }));
+
+    await waitFor(() => expect(navigateTo).toHaveBeenCalledWith(
+      "/login?next=%2Fstatistics%2F2026-08-10",
+    ));
+  });
+
+  it("keeps all group categories selected while fetching later transaction pages", async () => {
+    const user = userEvent.setup();
+    const first = { ...detailFixture.page.items[0], description: "월세", category: { ...detailFixture.page.items[0].category, id: "housing" } };
+    const second = { ...first, id: "55555555-5555-4555-8555-555555555555", description: "전화요금" };
+    const loadPage = vi.fn()
+      .mockResolvedValueOnce({ items: [first], nextCursor: "cursor-2" })
+      .mockResolvedValueOnce({ items: [second], nextCursor: null });
+    render(<StatisticsDetailScreen initialData={detailFixture} loadPage={loadPage} />);
+    await user.click(screen.getByRole("button", { name: /고정지출.*600,000원/ }));
+    await waitFor(() => expect(screen.getAllByText("월세").length).toBeGreaterThan(0));
+    expect(loadPage).toHaveBeenCalledWith(expect.objectContaining({ categoryIds: ["housing", "phone"] }), "");
+
+    await act(async () => observerCallback?.([{ isIntersecting: true } as IntersectionObserverEntry], {} as IntersectionObserver));
+    await waitFor(() => expect(screen.getAllByText("전화요금").length).toBeGreaterThan(0));
+    expect(loadPage).toHaveBeenLastCalledWith(expect.objectContaining({ categoryIds: ["housing", "phone"] }), "cursor-2");
   });
 
   it("loads the next source page once when the sentinel enters view", async () => {
