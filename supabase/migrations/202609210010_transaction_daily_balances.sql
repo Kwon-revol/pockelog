@@ -1,4 +1,4 @@
-create function public.get_transaction_daily_balances(
+create or replace function public.get_transaction_daily_balances(
   target_ledger_id uuid,
   start_on date,
   end_exclusive date,
