@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from "@testing-library/react";
+import { cleanup, render, screen, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -16,7 +16,26 @@ describe("AppShell", () => {
     navigationState.pathname = "/ledger";
   });
 
-  it("shows the current ledger, user, and the four primary destinations", () => {
+  it("hides the unused tax destination and evenly divides mobile navigation by visible items", () => {
+    render(
+      <AppShell
+        currentLedger={{ id: "11111111-1111-4111-8111-111111111111", name: "권님의 장부", kind: "personal", role: "owner" }}
+        ledgers={[{ id: "11111111-1111-4111-8111-111111111111", name: "권님의 장부", kind: "personal", role: "owner" }]}
+        pendingInvitationCount={0}
+        switchLedgerAction={async () => ({ status: "success" })}
+        userName="권혁"
+      >
+        <h1>가계부 내용</h1>
+      </AppShell>,
+    );
+
+    expect(screen.queryByRole("link", { name: "세금" })).not.toBeInTheDocument();
+    const mobileNavigation = screen.getByRole("navigation", { name: "모바일 주 메뉴" });
+    expect(within(mobileNavigation).getAllByRole("link")).toHaveLength(3);
+    expect(mobileNavigation).toHaveStyle({ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" });
+  });
+
+  it("shows the current ledger, user, and the three visible primary destinations", () => {
     render(
       <AppShell
         currentLedger={{ id: "11111111-1111-4111-8111-111111111111", name: "권님의 장부", kind: "personal", role: "owner" }}
@@ -34,13 +53,13 @@ describe("AppShell", () => {
     expect(screen.getByText("권혁님")).toBeInTheDocument();
     expect(screen.getByRole("heading", { name: "가계부 내용" })).toBeInTheDocument();
 
-    for (const label of ["가계부", "통계", "세금", "설정"]) {
+    for (const label of ["가계부", "통계", "설정"]) {
       expect(screen.getAllByRole("link", { name: label }).length).toBeGreaterThan(0);
     }
   });
 
   it("marks the current destination as selected in mobile and desktop navigation", () => {
-    navigationState.pathname = "/tax-goals";
+    navigationState.pathname = "/statistics";
     render(
       <AppShell
         currentLedger={{ id: "11111111-1111-4111-8111-111111111111", name: "권님의 장부", kind: "personal", role: "owner" }}
@@ -49,11 +68,11 @@ describe("AppShell", () => {
         switchLedgerAction={async () => ({ status: "success" })}
         userName="권혁"
       >
-        <h1>세금 내용</h1>
+        <h1>통계 내용</h1>
       </AppShell>,
     );
 
-    for (const link of screen.getAllByRole("link", { name: "세금" })) {
+    for (const link of screen.getAllByRole("link", { name: "통계" })) {
       expect(link).toHaveAttribute("aria-current", "page");
       expect(link).toHaveClass("bg-emerald-50", "text-emerald-800");
     }

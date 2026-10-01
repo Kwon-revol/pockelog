@@ -6,7 +6,7 @@ import { usePathname } from "next/navigation";
 const navigation = [
   { href: "/ledger", label: "가계부", icon: "book" },
   { href: "/statistics", label: "통계", icon: "chart" },
-  { href: "/tax-goals", label: "세금", icon: "tax" },
+  // { href: "/tax-goals", label: "세금", icon: "tax" },
   { href: "/settings", label: "설정", icon: "settings" },
 ] as const;
 
@@ -29,7 +29,11 @@ export function AppNavigation({ mobile = false }: { mobile?: boolean }) {
   const pathname = usePathname();
 
   return (
-    <nav aria-label={mobile ? "모바일 주 메뉴" : "주 메뉴"} className={mobile ? "grid grid-cols-4" : "space-y-2"}>
+    <nav
+      aria-label={mobile ? "모바일 주 메뉴" : "주 메뉴"}
+      className={mobile ? "grid" : "space-y-2"}
+      style={mobile ? { gridTemplateColumns: `repeat(${navigation.length}, minmax(0, 1fr))` } : undefined}
+    >
       {navigation.map((item) => {
         const active = pathname === item.href || pathname.startsWith(`${item.href}/`);
 
