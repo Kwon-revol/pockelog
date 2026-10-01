@@ -35,7 +35,7 @@ describe("AppShell", () => {
     expect(mobileNavigation).toHaveStyle({ gridTemplateColumns: "repeat(3, minmax(0, 1fr))" });
   });
 
-  it("floats the mobile navigation inside a rounded card above the screen edge", () => {
+  it("centers the mobile navigation in a two-thirds-width capsule above the screen edge", () => {
     render(
       <AppShell
         currentLedger={{ id: "11111111-1111-4111-8111-111111111111", name: "권님의 장부", kind: "personal", role: "owner" }}
@@ -50,16 +50,18 @@ describe("AppShell", () => {
 
     const mobileNavigationCard = screen.getByRole("navigation", { name: "모바일 주 메뉴" }).parentElement;
     expect(mobileNavigationCard).toHaveClass(
-      "inset-x-10",
+      "left-1/2",
+      "w-2/3",
+      "-translate-x-1/2",
       "bottom-[calc(1.25rem+env(safe-area-inset-bottom))]",
-      "rounded-[1.25rem]",
+      "rounded-full",
       "border",
       "p-[3px]",
       "shadow-[0_12px_40px_rgba(15,23,42,0.18)]",
     );
-    expect(mobileNavigationCard).not.toHaveClass("inset-x-0", "bottom-0");
+    expect(mobileNavigationCard).not.toHaveClass("inset-x-0", "inset-x-4", "bottom-0");
     const ledgerLink = within(mobileNavigationCard!).getByRole("link", { name: "가계부" });
-    expect(ledgerLink).toHaveClass("min-h-[38px]", "my-[3px]");
+    expect(ledgerLink).toHaveClass("min-h-11", "my-[3px]", "rounded-full");
     expect(ledgerLink.querySelector("svg")).toHaveClass("size-[22px]");
   });
 
