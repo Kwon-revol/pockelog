@@ -57,7 +57,7 @@ export function AppShell({ children, currentLedger, ledgers, pendingInvitationCo
         <main className="mx-auto max-w-6xl px-5 pb-28 pt-8 md:px-8 lg:pb-12 lg:pt-10">{children}</main>
       </div>
 
-      <div className="fixed inset-x-6 bottom-[calc(0.75rem+env(safe-area-inset-bottom))] z-30 rounded-[1.375rem] border border-slate-200/90 bg-white/95 p-[3px] shadow-[0_12px_40px_rgba(15,23,42,0.18)] backdrop-blur-xl lg:hidden">
+      <div className="fixed inset-x-10 bottom-[calc(1.25rem+env(safe-area-inset-bottom))] z-30 rounded-[1.25rem] border border-slate-200/90 bg-white/95 p-[3px] shadow-[0_12px_40px_rgba(15,23,42,0.18)] backdrop-blur-xl lg:hidden">
         <AppNavigation mobile />
       </div>
     </div>

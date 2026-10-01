@@ -50,15 +50,17 @@ describe("AppShell", () => {
 
     const mobileNavigationCard = screen.getByRole("navigation", { name: "모바일 주 메뉴" }).parentElement;
     expect(mobileNavigationCard).toHaveClass(
-      "inset-x-6",
-      "bottom-[calc(0.75rem+env(safe-area-inset-bottom))]",
-      "rounded-[1.375rem]",
+      "inset-x-10",
+      "bottom-[calc(1.25rem+env(safe-area-inset-bottom))]",
+      "rounded-[1.25rem]",
       "border",
       "p-[3px]",
       "shadow-[0_12px_40px_rgba(15,23,42,0.18)]",
     );
     expect(mobileNavigationCard).not.toHaveClass("inset-x-0", "bottom-0");
-    expect(within(mobileNavigationCard!).getByRole("link", { name: "가계부" })).toHaveClass("min-h-13");
+    const ledgerLink = within(mobileNavigationCard!).getByRole("link", { name: "가계부" });
+    expect(ledgerLink).toHaveClass("min-h-[38px]", "my-[3px]");
+    expect(ledgerLink.querySelector("svg")).toHaveClass("size-[22px]");
   });
 
   it("shows icon-only mobile tabs while preserving accessible and desktop labels", () => {

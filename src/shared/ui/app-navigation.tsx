@@ -19,7 +19,7 @@ function NavIcon({ mobile, name }: { mobile: boolean; name: (typeof navigation)[
   };
 
   return (
-    <svg aria-hidden="true" className={mobile ? "size-6" : "size-5"} fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
+    <svg aria-hidden="true" className={mobile ? "size-[22px]" : "size-5"} fill="none" stroke="currentColor" strokeLinecap="round" strokeLinejoin="round" strokeWidth="1.8" viewBox="0 0 24 24">
       {paths[name]}
     </svg>
   );
@@ -41,7 +41,7 @@ export function AppNavigation({ mobile = false }: { mobile?: boolean }) {
           <Link
             aria-current={active ? "page" : undefined}
             className={mobile
-              ? `mx-1 my-1 flex min-h-13 flex-col items-center justify-center gap-1 rounded-2xl text-xs font-semibold transition ${active ? "bg-emerald-50 text-emerald-800" : "text-slate-500 hover:bg-emerald-50 hover:text-emerald-700"}`
+              ? `mx-1 my-[3px] flex min-h-[38px] flex-col items-center justify-center gap-1 rounded-2xl text-xs font-semibold transition ${active ? "bg-emerald-50 text-emerald-800" : "text-slate-500 hover:bg-emerald-50 hover:text-emerald-700"}`
               : `flex items-center gap-3 rounded-2xl px-4 py-3.5 text-sm font-semibold transition ${active ? "bg-emerald-50 text-emerald-800" : "text-slate-600 hover:bg-emerald-50 hover:text-emerald-800"}`}
             href={item.href}
             key={item.href}
